@@ -24,10 +24,16 @@ RUN npm install
 # now copies everything else (your server.js and any other files) into
 COPY . .
 
-# documents that the container listens on port 8080. 
+# documentation purpose only for users that the container should listen on port 8080. 
+# As the internal app running inside the container is listening on port 8080, 
+# so we need to tell Docker to expose that port to the outside world.
 # This is informational (doesn't actually do the port mapping 
 # — that happens in docker run), but good practice.
-EXPOSE 3000
+EXPOSE 8080
 
 # the command that runs when the container starts: node server.js
-CMD ["node", "server.js"]
+CMD ["node", "server.js", "--port", "8080"]
+# added commnd-line arg "--port", "8080" as internal server is expecting an argument
+# being passed in or it will default to a possible other value
+# const { values } = parseArgs({ options: { port: { type: "string" } } });
+# const port = values.port || 8080;
