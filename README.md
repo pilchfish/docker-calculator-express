@@ -1,3 +1,7 @@
+Claude.ai has help me with this. 
+
+
+
 ## Step 3: Add a .dockerignore
 
 ─ node --eval "fs.writeFileSync('.dockerignore','# Ignore artifacts:\nnode_modules\njavascript_syntax_learnit.js\n')"
