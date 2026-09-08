@@ -110,3 +110,34 @@ On the Pi, over your SSH session:
 bash
 git clone https://github.com/<your-username>/<repo-name>.git
 cd <repo-name>
+
+
+
+
+Good catch — this is a common one, and it's fixable. Here's how to remove `node_modules` from the repo while keeping it on your local disk.
+
+**1. Create a `.gitignore` file** (in your project root, alongside `.dockerignore`)
+```
+node_modules
+```
+
+**2. Untrack `node_modules` without deleting the actual files**
+```bash
+git rm -r --cached node_modules
+```
+The `--cached` flag is the important part — it tells Git "stop tracking this," but leaves the actual folder sitting on your disk untouched. Without `--cached`, it would delete the files locally too.
+
+**3. Commit the change**
+```bash
+git add .gitignore
+git commit -m "Remove node_modules from tracking, add .gitignore"
+```
+
+**4. Push it**
+```bash
+git push
+```
+
+**One important thing to understand**: this removes `node_modules` from the *latest* commit going forward, but it's still sitting in your repo's history (in the earlier commits). For a personal learning project like this, that's generally not worth worrying about — nobody's going to dig through history for a `node_modules` folder, and it doesn't cause any functional problems. If you ever wanted it completely erased from history too (e.g., if it had contained secrets, which it doesn't here), that requires more advanced tools like `git filter-repo` — but for your case, the steps above are the right level of effort.
+
+**Going forward**: since `node_modules` is now in `.gitignore`, future commits won't pick it up again, and anyone (including you on the Pi) who clones the repo will just run `npm install` to regenerate it locally — which is exactly the normal, expected workflow. You don't want `node_modules` in Git at all, ever — it's meant to be regenerated from `package.json`, not version-controlled.
