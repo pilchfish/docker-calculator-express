@@ -46,6 +46,14 @@ api.get("/health", requestLogger, (req, res) => {
 api.get(endpoint, requestLogger, validateNumbers, divide);
 
 function divide(req, res) {
+  if (req.numB === 0) {
+    return res.status(400).json({
+      error_message: {
+        error: "Cannot divide by zero",
+        input: { a: a, b: b },
+      },
+    });
+  }
   const result = operations[symbol](req.numA, req.numB);
   res.json({
     mathmatic: mathmatic,
