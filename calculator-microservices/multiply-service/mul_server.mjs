@@ -13,24 +13,18 @@ const operations = {
 };
 
 api.use(express.json());
-api.use(globalLogger);
-
-function globalLogger(req, res, next) {
-  console.log(
-    `Global log[${mathmatic}] - `,
-    new Date().toISOString(),
-    " - ",
-    req.method,
-    req.url,
-  );
-  next();
-}
 
 function requestLogger(req, res, next) {
   console.log(
     `LOG[${mathmatic}] - ${new Date().toISOString()} - ${req.method} ${req.url} - params: ${JSON.stringify(req.params)} - query: ${JSON.stringify(req.query)} - body: ${JSON.stringify(req.body)}`,
   );
   next();
+}
+
+function errorLog(req, errorMessage) {
+  console.log(
+    `ERROR LOG[${mathmatic}] - Error: ${errorMessage} - ${new Date().toISOString()} - ${req.method} ${req.url} - params: ${JSON.stringify(req.params)} - query: ${JSON.stringify(req.query)} - body: ${JSON.stringify(req.body)}`,
+  );
 }
 
 api.get("/health", requestLogger, (req, res) => {
@@ -58,6 +52,7 @@ function multiply(req, res) {
 function validateNumbers(req, res, next) {
   const { a, b } = req.query;
   if (a === undefined || b === undefined) {
+    errorLog(req, 'Both "a" and "b" query parameters are required');
     return res.status(400).json({
       error_message: {
         error: 'Both "a" and "b" query parameters are required',
@@ -70,6 +65,7 @@ function validateNumbers(req, res, next) {
   const numB = Number(b);
 
   if (isNaN(numA) || isNaN(numB)) {
+    errorLog(req, '"a" and "b" must both be valid numbers');
     return res.status(400).json({
       error_message: {
         error: '"a" and "b" must both be valid numbers',
