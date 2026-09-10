@@ -1,0 +1,17 @@
+services:
+  add-service:
+    build: ./calculator-microservices/add-service
+    ports:
+      - "8081:8080"
+  subtract-service:
+    build: ./calculator-microservices/subtract-service
+    ports:
+      - "8082:8080"
+  multiply-service:
+    build: ./calculator-microservices/multiply-service
+    ports:
+      - "8083:8080"
+  divide-service:
+    build: ./calculator-microservices/divide-service
+    ports:
+      - "8084:8080"

@@ -1,7 +1,7 @@
 import express from "express";
 
 const api = express();
-const port = 8083;
+const port = 8080;
 const mathmatic = "divide";
 const endpoint = "/divide";
 const symbol = "/";
@@ -94,5 +94,5 @@ function validateNumbers(req, res, next) {
 
 // start the  server
 api.listen(port, () => {
-  console.log("Server is running on http://localhost:", port);
+  console.log("Server is running on http://localhost:", port, endpoint);
 });

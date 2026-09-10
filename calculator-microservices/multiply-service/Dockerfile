@@ -3,5 +3,5 @@ WORKDIR /app
 COPY */*/package*.json ./
 RUN npm install
 COPY . .
-EXPOSE 8082
+EXPOSE 8080
 CMD ["node", "mul_server.mjs"]

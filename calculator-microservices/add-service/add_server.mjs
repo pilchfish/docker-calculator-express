@@ -73,7 +73,7 @@ api.get(endpoint, requestLogger, validateNumbers, (req, res) => {
 
 // start the  server
 api.listen(port, () => {
-  console.log("Server is running on http://localhost:", port);
+  console.log("Server is running on http://localhost:", port, endpoint);
 });
 // var http = require('http') , https = require('https') , express = require('express') , app = express();
 // http.createServer(app).listen(80); https.createServer({ ... }, app).listen(443);
