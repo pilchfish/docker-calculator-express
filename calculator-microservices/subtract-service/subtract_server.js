@@ -5,9 +5,9 @@ import { validateNumbers as validateParameters } from "../../shared/validation.j
 
 const api = express();
 const port = 8080;
-const serverType = "divide";
-const endpoint = "/divide";
-const symbol = "/";
+const endpoint = "/subtract";
+const serverType = "subtract-server";
+const symbol = "-";
 
 api.use(express.json());
 api.use(requestLog(serverType));
@@ -18,22 +18,8 @@ api.get("/health", healthLogger);
 api.get(
   endpoint,
   validateParameters(serverType),
-  divideByZeroCheck,
   apiResponse(symbol, serverType),
 );
-
-function divideByZeroCheck(req, res, next) {
-  if (req.numB === 0) {
-    errorLog(req, "Cannot divide by zero");
-    return res.status(400).json({
-      error_message: {
-        error: "Cannot divide by zero",
-        input: { a: req.numA, b: req.numB },
-      },
-    });
-  }
-  next();
-}
 
 // start the  server
 api.listen(port, () => {

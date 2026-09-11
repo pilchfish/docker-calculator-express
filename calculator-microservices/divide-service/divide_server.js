@@ -5,9 +5,9 @@ import { validateNumbers as validateParameters } from "../../shared/validation.j
 
 const api = express();
 const port = 8080;
-const serverType = "multiply";
-const endpoint = "/multiply";
-const symbol = "*";
+const serverType = "divide-server";
+const endpoint = "/divide";
+const symbol = "/";
 
 api.use(express.json());
 api.use(requestLog(serverType));

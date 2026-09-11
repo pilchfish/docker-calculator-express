@@ -33,8 +33,36 @@ export function validateNumbers(serverType) {
       });
     }
 
+    if (serverType === "divide-server") {
+      if (numB === 0) {
+        errorLog(serverType, "Cannot divide by zero", req);
+        return res.status(400).json({
+          error_message: {
+            error: "Cannot divide by zero",
+            input: { a: numA, b: numB },
+          },
+        });
+      }
+    }
+    
     req.numA = numA;
     req.numB = numB;
+
     next();
   };
 }
+
+// export function divideByZeroCheck(serverType) {
+//   return function (req, res, next) {
+//     if (req.numB === 0) {
+//       errorLog(serverType, "Cannot divide by zero", req);
+//       return res.status(400).json({
+//         error_message: {
+//           error: "Cannot divide by zero",
+//           input: { a: req.numA, b: req.numB },
+//         },
+//       });
+//     }
+//     next();
+//   };
+// }

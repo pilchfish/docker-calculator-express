@@ -4,4 +4,4 @@ COPY */*/package*.json ./
 RUN npm install
 COPY . .
 EXPOSE 8080
-CMD ["node", "div_server.mjs"]
+CMD ["node", "divide_server.js"]

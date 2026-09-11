@@ -4,4 +4,4 @@ COPY */*/package*.json ./
 RUN npm install
 COPY . .
 EXPOSE 8080
-CMD ["node", "sub_server.mjs"]
+CMD ["node", "subtract_server.js"]
