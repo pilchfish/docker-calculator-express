@@ -1,11 +1,10 @@
 {
-  "name": "calc_node_docker",
+  "name": "multiply-service",
   "version": "1.0.0",
   "description": "",
-  "main": "index.js",
+  "main": "mul_server.js",
   "scripts": {
-    "test": "node --test server.js",
-    "start": "node server.js"
+    "test": "echo \"Error: no test specified\" && exit 1"
   },
   "keywords": [],
   "type": "module",
