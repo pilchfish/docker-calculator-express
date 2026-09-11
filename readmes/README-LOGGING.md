@@ -74,3 +74,4 @@ Give the browser URL a try and let me know what comes back.
 
 
 docker compose logs -f in the last step is genuinely useful and different from what you've used before (docker logs -f <container-id>) — it shows logs from all services in the compose file at once, each prefixed with its service name, so you can watch four containers' output interleaved in one terminal.
+Give the browser URL a try and let me know what comes back.

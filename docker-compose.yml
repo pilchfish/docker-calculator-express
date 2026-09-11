@@ -35,3 +35,7 @@ services:
       - ENDPOINT=/divide
       - SERVER_TYPE=divide-service
       - SYMBOL=/
+  divide-service:
+    build: ./calculator-microservices/divide-service
+    ports:
+      - "8084:8080"
