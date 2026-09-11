@@ -4,10 +4,10 @@ import { healthCheck, apiResponse } from "../../shared/responses.js";
 import { validateNumbers as validateParameters } from "../../shared/validation.js";
 
 const api = express();
-const port = 8080;
-const endpoint = "/add";
-const serverType = "add-server";
-const symbol = "+";
+const port = Number(process.env.PORT || 8080);
+const endpoint = process.env.ENDPOINT || "/add";
+const serverType = process.env.SERVER_TYPE || "add-server";
+const symbol = process.env.SYMBOL || "+";
 
 api.use(express.json());
 api.use(requestLog(serverType));

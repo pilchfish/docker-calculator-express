@@ -4,10 +4,10 @@ import { healthCheck, apiResponse } from "../../shared/responses.js";
 import { validateNumbers as validateParameters } from "../../shared/validation.js";
 
 const api = express();
-const port = 8080;
-const serverType = "multiply-server";
-const endpoint = "/multiply";
-const symbol = "*";
+const port = Number(process.env.PORT || 8080);
+const serverType = process.env.SERVER_TYPE || "multiply-server";
+const endpoint = process.env.ENDPOINT || "/multiply";
+const symbol = process.env.SYMBOL || "*";
 
 api.use(express.json());
 api.use(requestLog(serverType));
