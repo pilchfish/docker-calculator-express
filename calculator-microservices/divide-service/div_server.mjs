@@ -1,53 +1,26 @@
 import express from "express";
+import { requestLog } from "../../shared/loggers.js";
+import { healthCheck, apiResponse } from "../../shared/responses.js";
+import { validateNumbers as validateParameters } from "../../shared/validation.js";
 
 const api = express();
 const port = 8080;
-const mathmatic = "divide";
+const serverType = "divide";
 const endpoint = "/divide";
 const symbol = "/";
-const operations = {
-  "+": (a, b) => a + b,
-  "-": (a, b) => a - b,
-  "*": (a, b) => a * b,
-  "/": (a, b) => a / b,
-};
 
 api.use(express.json());
+api.use(requestLog(serverType));
 
-function requestLogger(req, res, next) {
-  console.log(
-    `LOG[${mathmatic}] - ${new Date().toISOString()} - ${req.method} ${req.url} - params: ${JSON.stringify(req.params)} - query: ${JSON.stringify(req.query)} - body: ${JSON.stringify(req.body)}`,
-  );
-  next();
-}
+const healthLogger = healthCheck(serverType, port);
+api.get("/health", healthLogger);
 
-function errorLog(req, errorMessage) {
-  console.log(
-    `ERROR LOG[${mathmatic}] - Error: ${errorMessage} - ${new Date().toISOString()} - ${req.method} ${req.url} - params: ${JSON.stringify(req.params)} - query: ${JSON.stringify(req.query)} - body: ${JSON.stringify(req.body)}`
-  );
-}
-
-api.get("/health", requestLogger, (req, res) => {
-  res.json({
-    status: "ok",
-    mathmatic: mathmatic,
-    method: req.method,
-    port: port,
-    url: req.url,
-  });
-});
-
-api.get(endpoint, requestLogger, validateNumbers, divideByZeroCheck, divide);
-
-function divide(req, res) {
-  const result = operations[symbol](req.numA, req.numB);
-  res.json({
-    mathmatic: mathmatic,
-    symbol: symbol,
-    input: { a: req.numA, b: req.numB },
-    result: result,
-  });
-}
+api.get(
+  endpoint,
+  validateParameters(serverType),
+  divideByZeroCheck,
+  apiResponse(symbol, serverType),
+);
 
 function divideByZeroCheck(req, res, next) {
   if (req.numB === 0) {
@@ -59,36 +32,6 @@ function divideByZeroCheck(req, res, next) {
       },
     });
   }
-  next();
-}
-
-function validateNumbers(req, res, next) {
-  const { a, b } = req.query;
-  if (a === undefined || b === undefined) {
-    errorLog(req, 'Both "a" and "b" query parameters are required');
-    return res.status(400).json({
-      error_message: {
-        error: 'Both "a" and "b" query parameters are required',
-        input: { a: a === undefined ? null : a, b: b === undefined ? null : b },
-      },
-    });
-  }
-
-  const numA = Number(a);
-  const numB = Number(b);
-
-  if (isNaN(numA) || isNaN(numB)) {
-    errorLog(req, '"a" and "b" must both be valid numbers');
-    return res.status(400).json({
-      error_message: {
-        error: '"a" and "b" must both be valid numbers',
-        input: { a: isNaN(numA) ? a : numA, b: isNaN(numB) ? b : numB },
-      },
-    });
-  }
-
-  req.numA = numA;
-  req.numB = numB;
   next();
 }
 
