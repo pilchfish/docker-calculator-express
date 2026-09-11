@@ -3,14 +3,38 @@ services:
     build: ./calculator-microservices/add-service
     ports:
       - "8081:8080"
+    environment:
+      - PORT=8080
+      - ENDPOINT=/add
+      - SERVER_TYPE=add-service
+      - SYMBOL=+
   subtract-service:
     build: ./calculator-microservices/subtract-service
     ports:
       - "8082:8080"
+    environment:
+      - PORT=8080
+      - ENDPOINT=/subtract
+      - SERVER_TYPE=subtract-service
+      - SYMBOL=-
   multiply-service:
     build: ./calculator-microservices/multiply-service
     ports:
       - "8083:8080"
+    environment:
+      - PORT=8080
+      - ENDPOINT=/multiply
+      - SERVER_TYPE=multiply-service
+      - SYMBOL=*
+  divide-service:
+    build: ./calculator-microservices/divide-service
+    ports:
+      - "8084:8080"
+    environment:
+      - PORT=8080
+      - ENDPOINT=/divide
+      - SERVER_TYPE=divide-service
+      - SYMBOL=/
   divide-service:
     build: ./calculator-microservices/divide-service
     ports:

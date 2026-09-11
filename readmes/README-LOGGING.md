@@ -66,3 +66,12 @@ curl http://192.168.0.81:8080/add?a=5&b=3
 - Check the Pi's firewall isn't blocking it (Raspberry Pi OS usually doesn't enable one by default, but worth knowing if you ever add `ufw` or similar later).
 
 Give the browser URL a try and let me know what comes back.
+
+
+
+
+
+
+
+docker compose logs -f in the last step is genuinely useful and different from what you've used before (docker logs -f <container-id>) — it shows logs from all services in the compose file at once, each prefixed with its service name, so you can watch four containers' output interleaved in one terminal.
+Give the browser URL a try and let me know what comes back.
