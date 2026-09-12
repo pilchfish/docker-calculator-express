@@ -13,7 +13,3 @@ export function errorLog(serverType, errorMessage, req) {
   );
 }
 
-// export default {
-// requestLogger,
-// errorLog,
-// };
