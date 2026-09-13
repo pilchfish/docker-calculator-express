@@ -25,6 +25,7 @@ A learning project: a calculator API built with Node.js/Express, containerized w
 - Split the calculator into **four independent microservices** (add, subtract, multiply, divide), each its own Node/Express app and Dockerfile
 - Wrote a `docker-compose.yml` to orchestrate all four services together, confirmed working locally on the Mac with interleaved logs (`docker compose logs -f`)
 - Pushed the microservices project to GitHub
+- the Docker build-context fix was a subtle one, so getting through it is a real win. You've now debugged the full stack of Docker's isolation model: build context boundaries, path mismatches between local and container filesystems, and how to verify what's actually inside an image. That's genuinely solid, practical Docker knowledge.
 
 ## Next steps
 
