@@ -1,6 +1,8 @@
 services:
   add-service:
-    build: ./calculator-microservices/add-service
+    build:
+      context: .
+      dockerfile: calculator-microservices/add-service/Dockerfile
     ports:
       - "8081:8080"
     environment:
@@ -8,8 +10,21 @@ services:
       - ENDPOINT=/add
       - SERVER_TYPE=add-service
       - SYMBOL=+
+    develop:
+      watch:
+        - action: sync+restart
+          path: ./calculator-microservices/add-service
+          target: /app/calculator-microservices/add-service
+          ignore:
+            - node_modules/
+        - action: sync+restart
+          path: ./shared
+          target: /app/shared
+
   subtract-service:
-    build: ./calculator-microservices/subtract-service
+    build:
+      context: .
+      dockerfile: calculator-microservices/subtract-service/Dockerfile
     ports:
       - "8082:8080"
     environment:
@@ -17,8 +32,23 @@ services:
       - ENDPOINT=/subtract
       - SERVER_TYPE=subtract-service
       - SYMBOL=-
+    develop:
+      watch:
+        - action: sync+restart
+          path: ./calculator-microservices/subtract-service
+          target: /app/calculator-microservices/subtract-service
+          ignore:
+            - node_modules/
+        - action: sync+restart
+          path: ./shared
+          target: /app/shared
+        - action: rebuild
+          path: ./calculator-microservices/subtract-service/package.json
+
   multiply-service:
-    build: ./calculator-microservices/multiply-service
+    build:
+      context: .
+      dockerfile: calculator-microservices/multiply-service/Dockerfile
     ports:
       - "8083:8080"
     environment:
@@ -26,8 +56,23 @@ services:
       - ENDPOINT=/multiply
       - SERVER_TYPE=multiply-service
       - SYMBOL=*
+    develop:
+      watch:
+        - action: sync+restart
+          path: ./calculator-microservices/multiply-service
+          target: /app/calculator-microservices/multiply-service
+          ignore:
+            - node_modules/
+        - action: sync+restart
+          path: ./shared
+          target: /app/shared
+        - action: rebuild
+          path: ./calculator-microservices/multiply-service/package.json
+          
   divide-service:
-    build: ./calculator-microservices/divide-service
+    build:
+      context: .
+      dockerfile: calculator-microservices/divide-service/Dockerfile
     ports:
       - "8084:8080"
     environment:
@@ -35,3 +80,15 @@ services:
       - ENDPOINT=/divide
       - SERVER_TYPE=divide-service
       - SYMBOL=/
+    develop:
+      watch:
+        - action: sync+restart
+          path: ./calculator-microservices/divide-service
+          target: /app/calculator-microservices/divide-service
+          ignore:
+            - node_modules/
+        - action: sync+restart
+          path: ./shared
+          target: /app/shared
+        - action: rebuild
+          path: ./calculator-microservices/divide-service/package.json

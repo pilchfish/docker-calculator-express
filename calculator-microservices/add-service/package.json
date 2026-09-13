@@ -4,7 +4,8 @@
   "description": "",
   "main": "add_server.js",
   "scripts": {
-    "test": "echo \"Error: no test specified\" && exit 1"
+    "test": "echo \"Error: no test specified\" && exit 1",
+    "run:add": "node --watch add_server.js"
   },
   "keywords": [],
   "type": "module",

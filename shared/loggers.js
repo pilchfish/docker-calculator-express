@@ -13,3 +13,14 @@ export function errorLog(serverType, errorMessage, req) {
   );
 }
 
+export function serverStartUp(serverType, port, endpoint) {
+  return function () {
+    console.log(
+      "[",
+      serverType,
+      "] is running on http://localhost:",
+      port,
+      endpoint,
+    );
+  };
+}

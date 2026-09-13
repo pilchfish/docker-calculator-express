@@ -1,13 +1,13 @@
 import express from "express";
-import { requestLog } from "../../shared/loggers.js";
+import { requestLog, serverStartUp } from "../../shared/loggers.js";
 import { healthCheck, apiResponse } from "../../shared/responses.js";
 import { validateNumbers as validateParameters } from "../../shared/validation.js";
 
 const api = express();
 const port = Number(process.env.PORT || 8080);
-const serverType = process.env.SERVER_TYPE || "divide-server";
-const endpoint = process.env.ENDPOINT || "/divide";
-const symbol = process.env.SYMBOL || "/";
+const endpoint = process.env.ENDPOINT;
+const serverType = process.env.SERVER_TYPE;
+const symbol = process.env.SYMBOL;
 
 api.use(express.json());
 api.use(requestLog(serverType));
@@ -22,6 +22,4 @@ api.get(
 );
 
 // start the  server
-api.listen(port, () => {
-  console.log("Server is running on http://localhost:", port, endpoint);
-});
+api.listen(port, serverStartUp(serverType, port, endpoint));
