@@ -62,24 +62,5 @@ A learning project: a calculator API built with Node.js/Express, containerized w
 - **Docker Compose build context isolation**: each service in a multi-container project only sees files within its own build context by default — sharing code across services needs to be deliberately wired up
 
 
+# after PR https://github.com/pilchfish/docker-calculator-express/pull/4
 
-junk to be removed 
-
-1
-Extract the shared validateNumbers middleware
-Right now each service repeats the same validateNumbers function word-for-word. Create a shared folder (e.g. shared/validate.js) at the parent level containing just that function, exported with module.exports. This is the single biggest duplication in the project and the most valuable one to fix first.
-2
-Make the shared file reachable from each container
-Since each service is its own independent Docker build context, a file sitting in a parent shared/ folder isn't automatically visible inside each service's container. The cleanest fix: in each service's Dockerfile, add a COPY ../shared ./shared line (or restructure so shared/ sits inside a common parent that all four COPY commands can reach). This is a good moment to learn a real constraint of multi-service Docker projects: containers can't casually reach files outside their own build context without you explicitly wiring it up.
-3
-Switch from parseArgs to environment variables for the port
-Swap out the parseArgs/--port command-line approach for Docker's more idiomatic environment variable pattern: read process.env.PORT || 8080 in server.js, and set environment: - PORT=8080 in docker-compose.yml for each service instead of relying on CMD arguments. This is the standard way real-world containerized apps handle configuration, and removes the parseArgs dependency entirely.
-4
-Review the four Dockerfiles for consistency
-Right now your four Dockerfiles are near-identical copies. Once shared/ exists, double check each Dockerfile's COPY lines are consistent and nothing is duplicated unnecessarily. This won't remove the four separate Dockerfiles (each service still needs its own, since they're independently built and deployed) but ensures they stay in sync as templates of each other.
-5
-Standardize error response format across all four services
-Each service currently returns errors slightly differently if you copy-pasted and tweaked over time. Standardize on one JSON error shape across all four, e.g. always { "error": "message" } with the same 400 status for bad input, so a client calling any of the four services can rely on one consistent response format.
-6
-Retest after each change
-After each change above, rerun docker compose up --build locally on the Mac and retest all four endpoints before moving on to the next refactor step. Refactoring one thing at a time and testing after each keeps you from having to debug multiple changes at once if something breaks.

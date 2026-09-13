@@ -4,8 +4,7 @@
   "description": "",
   "main": "add_server.js",
   "scripts": {
-    "test": "echo \"Error: no test specified\" && exit 1",
-    "run:add": "node --watch add_server.js"
+    "run": "node --watch --env-file=.env add_server.js"
   },
   "keywords": [],
   "type": "module",
