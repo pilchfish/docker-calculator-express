@@ -12,4 +12,4 @@ WORKDIR /app/calculator-microservices/multiply-service
 
 EXPOSE 8080
 
-CMD ["node", "multiply_server.js"]
+CMD ["npx", "nodemon", "multiply_server.js"]

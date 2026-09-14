@@ -12,12 +12,12 @@ services:
       - SYMBOL=+
     develop:
       watch:
-        - action: sync+restart
+        - action: sync
           path: ./calculator-microservices/add-service
           target: /app/calculator-microservices/add-service
           ignore:
             - node_modules/
-        - action: sync+restart
+        - action: sync
           path: ./shared
           target: /app/shared
 
@@ -34,12 +34,12 @@ services:
       - SYMBOL=-
     develop:
       watch:
-        - action: sync+restart
+        - action: sync
           path: ./calculator-microservices/subtract-service
           target: /app/calculator-microservices/subtract-service
           ignore:
             - node_modules/
-        - action: sync+restart
+        - action: sync
           path: ./shared
           target: /app/shared
         - action: rebuild
@@ -58,12 +58,12 @@ services:
       - SYMBOL=*
     develop:
       watch:
-        - action: sync+restart
+        - action: sync
           path: ./calculator-microservices/multiply-service
           target: /app/calculator-microservices/multiply-service
           ignore:
             - node_modules/
-        - action: sync+restart
+        - action: sync
           path: ./shared
           target: /app/shared
         - action: rebuild
@@ -82,12 +82,12 @@ services:
       - SYMBOL=/
     develop:
       watch:
-        - action: sync+restart
+        - action: sync
           path: ./calculator-microservices/divide-service
           target: /app/calculator-microservices/divide-service
           ignore:
             - node_modules/
-        - action: sync+restart
+        - action: sync
           path: ./shared
           target: /app/shared
         - action: rebuild
