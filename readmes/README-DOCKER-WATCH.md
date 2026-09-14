@@ -646,3 +646,46 @@ Those two actions work by copying a specific changed file *directly into a speci
 **Why this matters practically for `package.json` specifically**
 
 This is exactly the right action for `package.json` too — if your dependencies change, you genuinely need `npm install` to run again inside the image, which only a real rebuild does. A `sync` or `sync+restart` would just copy the new `package.json` in without ever running `npm install` against it, leaving your container with outdated dependencies despite the file itself looking correct.
+
+
+
+
+
+
+
+
+
+Good question, and the answer is: yes, you still need the `watch` section — but its job has narrowed, since nodemon is now handling part of what it used to do.
+
+**Why you still need it**
+
+`nodemon` runs *inside* the container, watching files that are *inside* the container's filesystem. But when you edit `add_server.js` on your Mac, that change only exists on your Mac's disk — it doesn't automatically appear inside the running container. Something still has to physically copy that changed file into the container. That's exactly what Compose's `watch` mechanism does — it's solving a completely different problem than nodemon.
+
+**So the two tools now split the work cleanly:**
+- **Compose `watch` (`sync` action)** — gets the changed file *into* the container
+- **`nodemon`** — notices the file changed *inside* the container, and restarts Node to pick it up
+
+**What changes in your `watch` config: drop `sync+restart` back down to plain `sync`**
+
+```yaml
+develop:
+  watch:
+    - action: sync
+      path: ./calculator-microservices/add-service
+      target: /app/calculator-microservices/add-service
+      ignore:
+        - node_modules/
+    - action: sync
+      path: ./shared
+      target: /app/shared
+    - action: rebuild
+      path: ./calculator-microservices/add-service/package.json
+```
+
+Since nodemon now handles the "restart the process" part itself, having Compose *also* restart the entire container (`sync+restart`) would be redundant — possibly even fight with nodemon's own restart, since both would be trying to trigger a restart from two different layers at roughly the same time.
+
+**Don't forget the gateway needs this too**
+
+Since the gateway also runs via `npx nodemon`, it should get the identical `develop.watch` treatment in `docker-compose.yml` — same `sync` pattern, pointed at the `gateway/` folder instead.
+
+**A good way to verify it's genuinely nodemon doing the restarting, not Compose**: watch the logs while editing a file — if you see nodemon's own message (`[nodemon] restarting due to changes...`), that confirms nodemon is the one reacting, with Compose's `sync` having quietly done its one job (getting the file there) just before that.
