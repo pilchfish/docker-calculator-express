@@ -1,6 +1,11 @@
 import express from "express";
 import { requestLog, serverStartUp } from "../../shared/loggers.js";
-import { healthCheck, apiResponse } from "../../shared/responses.js";
+import {
+  healthCheck,
+  apiResponseSuccess,
+  apiResponseEndpointNotFound,
+  apiResponseUnknownServerError as apiResponseServerError,
+} from "../../shared/responses.js";
 import { validateNumbers as validateParameters } from "../../shared/validation.js";
 
 const api = express();
@@ -18,8 +23,12 @@ api.get("/health", healthLogger);
 api.get(
   endpoint,
   validateParameters(serverType),
-  apiResponse(symbol, serverType),
+  apiResponseSuccess(symbol, serverType),
 );
+
+api.use(apiResponseEndpointNotFound(endpoint));
+
+api.use(apiResponseServerError(serverType));
 
 // start the  server
 api.listen(port, serverStartUp(serverType, port, endpoint));

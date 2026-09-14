@@ -33,18 +33,6 @@ export function validateNumbers(serverType) {
       });
     }
 
-    if (serverType === "divide-service") {
-      if (numB === 0) {
-        errorLog(serverType, "Cannot divide by zero", req);
-        return res.status(400).json({
-          error_message: {
-            error: "Cannot divide by zero",
-            input: { a: numA, b: numB },
-          },
-        });
-      }
-    }
-    
     req.numA = numA;
     req.numB = numB;
 

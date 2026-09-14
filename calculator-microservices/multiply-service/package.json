@@ -4,7 +4,7 @@
   "description": "",
   "main": "multiply_server.js",
   "scripts": {
-    "test": "echo \"Error: no test specified\" && exit 1"
+    "run": "node --watch --env-file=.env multipy_server.js"
   },
   "keywords": [],
   "type": "module",
