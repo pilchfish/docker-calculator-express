@@ -12,4 +12,4 @@ WORKDIR /app/calculator-microservices/add-service
 
 EXPOSE 8080
 
-CMD ["node", "add_server.js"]
+CMD ["npx", "nodemon", "add_server.js"]

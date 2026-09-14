@@ -12,4 +12,4 @@ WORKDIR /app/calculator-microservices/divide-service
 
 EXPOSE 8080
 
-CMD ["node", "divide_server.js"]
+CMD ["npx", "nodemon", "divide_server.js"]

@@ -12,4 +12,4 @@ WORKDIR /app/calculator-microservices/subtract-service
 
 EXPOSE 8080
 
-CMD ["node", "subtract_server.js"]
+CMD ["npx", "nodemon", "subtract_server.js"]
