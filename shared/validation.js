@@ -35,7 +35,7 @@ export function validateNumbers(serverType) {
 
     req.numA = numA;
     req.numB = numB;
-    console.log("FINISHED VALIDATION");
+
     next();
   };
 }
