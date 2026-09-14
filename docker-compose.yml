@@ -68,7 +68,7 @@ services:
           target: /app/shared
         - action: rebuild
           path: ./calculator-microservices/multiply-service/package.json
-          
+
   divide-service:
     build:
       context: .
@@ -92,3 +92,22 @@ services:
           target: /app/shared
         - action: rebuild
           path: ./calculator-microservices/divide-service/package.json
+
+  gateway:
+    build:
+      context: .
+      dockerfile: calculator-microservices/gateway/Dockerfile
+    ports:
+      - "8080:8080"
+    environment:
+      - PORT=8080
+    depends_on:
+      - add-service
+      - subtract-service
+      - multiply-service
+      - divide-service
+    develop:
+      watch:
+        - action: sync
+          path: ./calculator-microservices/gateway
+          target: /app/gateway

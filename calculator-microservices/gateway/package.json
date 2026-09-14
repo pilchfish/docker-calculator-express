@@ -1,0 +1,22 @@
+{
+  "name": "gateway",
+  "version": "1.0.0",
+  "description": "",
+  "main": "gateway_server.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "keywords": [],
+  "type": "module",
+  "dependencies": {
+    "expree": "^2.1.0",
+    "express": "^4.22.3"
+  },
+  "allowScripts": {
+    "@scarf/scarf@1.4.0": true,
+    "fsevents@2.3.3": true
+  },
+  "devDependencies": {
+    "nodemon": "^3.1.14"
+  }
+}
