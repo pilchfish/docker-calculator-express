@@ -9,11 +9,9 @@
   "keywords": [],
   "type": "module",
   "dependencies": {
-    "expree": "^2.1.0",
-    "express": "^4.22.3"
+    "express": "^5.2.1"
   },
   "allowScripts": {
-    "@scarf/scarf@1.4.0": true,
     "fsevents@2.3.3": true
   },
   "devDependencies": {
