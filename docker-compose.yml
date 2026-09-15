@@ -22,9 +22,10 @@ services:
           target: /app/shared
     healthcheck:
       test: ["CMD", "wget", "-qO-", "http://localhost:8080/health"]
-      interval: 10s
+      interval: ${HEALTHCHECK_INTERVAL:-10s}
       timeout: 3s
       retries: 3
+      start_period: 15s
 
   subtract-service:
     build:
@@ -51,9 +52,10 @@ services:
           path: ./calculator-microservices/subtract-service/package.json
     healthcheck:
       test: ["CMD", "wget", "-qO-", "http://localhost:8080/health"]
-      interval: 10s
+      interval: ${HEALTHCHECK_INTERVAL:-10s}
       timeout: 3s
       retries: 3
+      start_period: 15s
 
   multiply-service:
     build:
@@ -80,9 +82,10 @@ services:
           path: ./calculator-microservices/multiply-service/package.json
     healthcheck:
       test: ["CMD", "wget", "-qO-", "http://localhost:8080/health"]
-      interval: 10s
+      interval: ${HEALTHCHECK_INTERVAL:-10s}
       timeout: 3s
       retries: 3
+      start_period: 15s
 
   divide-service:
     build:
@@ -109,9 +112,10 @@ services:
           path: ./calculator-microservices/divide-service/package.json
     healthcheck:
       test: ["CMD", "wget", "-qO-", "http://localhost:8080/health"]
-      interval: 10s
+      interval: ${HEALTHCHECK_INTERVAL:-10s}
       timeout: 3s
       retries: 3
+      start_period: 15s
 
   gateway:
     build:

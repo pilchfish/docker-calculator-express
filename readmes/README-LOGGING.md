@@ -75,3 +75,52 @@ Give the browser URL a try and let me know what comes back.
 
 docker compose logs -f in the last step is genuinely useful and different from what you've used before (docker logs -f <container-id>) — it shows logs from all services in the compose file at once, each prefixed with its service name, so you can watch four containers' output interleaved in one terminal.
 Give the browser URL a try and let me know what comes back.
+
+
+
+
+
+
+# Healthcheck logging
+
+just want to stay on this for now as when I run 
+docker compose logs -f
+
+it constantly churns out what looks like requests hitting the /health endpoint. 
+
+and they are still coming. Do you know why this would be happening
+
+
+
+
+Good catch to want this explained rather than just accept it — but this is genuinely expected behavior, not a bug. Let's connect the dots.
+
+**This is your own healthcheck config, working exactly as configured**
+
+Remember what you set:
+```yaml
+healthcheck:
+  test: ["CMD", "wget", "-qO-", "http://localhost:8080/health"]
+  interval: 10s
+  timeout: 3s
+  retries: 3
+  start_period: 15s
+```
+
+`interval: 10s` means "check this container's health every 10 seconds, forever, for as long as the container is running." Not just once at startup — continuously, for the entire life of the container. That's precisely what a healthcheck is *for*: ongoing monitoring, not a one-time boot check. So every 10 seconds, Docker itself runs `wget -qO- http://localhost:8080/health` inside each container, which is exactly what's generating that steady stream of `GET /health` log lines you're seeing — one roughly every 10 seconds, per service, indefinitely.
+
+**Why it looks like it's "constantly churning"**
+
+With four services each getting a `/health` hit every ~10 seconds, interleaved together in `docker compose logs -f`, you get a genuinely continuous stream — four log lines roughly every 10 seconds, forever, which does look relentless when you're staring at a live-tailing terminal.
+
+**Is this a problem?**
+
+Not really — this is just what a healthcheck *is*. Docker (and Compose, and orchestrators generally) rely on continuous checking, not a one-off "checked once, assumed fine forever" approach, so that if a service crashes or hangs at 3am, something would actually notice. The trade-off is exactly what you're observing: a constant trickle of health-check traffic and log noise.
+
+**If the log noise itself is annoying you while developing, a few options:**
+
+- **Increase the interval** — e.g. `interval: 30s` or even `60s`, if checking every 10 seconds is more frequent than you actually need for a personal project like this
+- **Filter it out of your logs while tailing** — e.g. `docker compose logs -f | grep -v '/health'` to hide those lines without changing the healthcheck itself
+- **Leave it as is** — it's a good, low-cost way to *see* that your containers are alive and responding, which can actually be reassuring rather than annoying, especially once this is running unattended on the Pi
+
+**Nothing here suggests anything is broken** — this is simply what "we added healthchecks" concretely looks like once it's running continuously, which is worth having actually witnessed rather than just reading about in the abstract.
