@@ -20,6 +20,12 @@ services:
         - action: sync
           path: ./shared
           target: /app/shared
+    healthcheck:
+      test: ["CMD", "wget", "-qO-", "http://localhost:8080/health"]
+      interval: ${HEALTHCHECK_INTERVAL:-10s}
+      timeout: 3s
+      retries: 3
+      start_period: 15s
 
   subtract-service:
     build:
@@ -44,6 +50,12 @@ services:
           target: /app/shared
         - action: rebuild
           path: ./calculator-microservices/subtract-service/package.json
+    healthcheck:
+      test: ["CMD", "wget", "-qO-", "http://localhost:8080/health"]
+      interval: ${HEALTHCHECK_INTERVAL:-10s}
+      timeout: 3s
+      retries: 3
+      start_period: 15s
 
   multiply-service:
     build:
@@ -68,6 +80,12 @@ services:
           target: /app/shared
         - action: rebuild
           path: ./calculator-microservices/multiply-service/package.json
+    healthcheck:
+      test: ["CMD", "wget", "-qO-", "http://localhost:8080/health"]
+      interval: ${HEALTHCHECK_INTERVAL:-10s}
+      timeout: 3s
+      retries: 3
+      start_period: 15s
 
   divide-service:
     build:
@@ -92,6 +110,12 @@ services:
           target: /app/shared
         - action: rebuild
           path: ./calculator-microservices/divide-service/package.json
+    healthcheck:
+      test: ["CMD", "wget", "-qO-", "http://localhost:8080/health"]
+      interval: ${HEALTHCHECK_INTERVAL:-10s}
+      timeout: 3s
+      retries: 3
+      start_period: 15s
 
   gateway:
     build:
@@ -101,13 +125,17 @@ services:
       - "8080:8080"
     environment:
       - PORT=8080
-    depends_on:
-      - add-service
-      - subtract-service
-      - multiply-service
-      - divide-service
     develop:
       watch:
         - action: sync
           path: ./calculator-microservices/gateway
           target: /app/gateway
+    depends_on:
+      add-service:
+        condition: service_healthy
+      subtract-service:
+        condition: service_healthy
+      multiply-service:
+        condition: service_healthy
+      divide-service:
+        condition: service_healthy

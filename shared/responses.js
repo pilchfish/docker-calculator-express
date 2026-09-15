@@ -8,12 +8,11 @@ const operations = {
 };
 
 export function healthCheck(serverType, port) {
-  return function (req, res, next) {
+  return function (req, res) {
     res.json({
       server: `${serverType}`,
       details: { status: "ok", method: req.method, port: port, url: req.url },
     });
-    next();
   };
 }
 

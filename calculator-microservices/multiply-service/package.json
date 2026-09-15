@@ -4,7 +4,7 @@
   "description": "",
   "main": "multiply_server.js",
   "scripts": {
-    "run": "node --watch --env-file=.env multipy_server.js"
+    "run": "node --watch --env-file=.env multiply_server.js"
   },
   "keywords": [],
   "type": "module",
