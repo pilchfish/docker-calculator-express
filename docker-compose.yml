@@ -1,7 +1,7 @@
 services:
 
   nginx-proxy:
-    image: ngine:alpine
+    image: nginx:alpine
     ports:
       - "8888:80"
     volumes:
