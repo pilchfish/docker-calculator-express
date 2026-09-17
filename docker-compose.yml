@@ -13,9 +13,6 @@ services:
     build:
       context: .
       dockerfile: calculator-microservices/gateway/Dockerfile
-    ports:
-      # - "8080:8080"
-      # - "${PROXY:-8080:8080}"
     environment:
       - PORT=8080
     develop:
