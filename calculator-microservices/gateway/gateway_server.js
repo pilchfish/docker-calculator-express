@@ -25,7 +25,20 @@ gateway.get("/:operation", async (req, res) => {
   const { a, b } = req.query;
   const url = `http://${serviceName}:8080/${req.params.operation}?a=${a}&b=${b}`;
 
-  const response = await fetch(url);
+  const response = await fetch(url, {
+    headers: {
+      "X-Forwarded-For": req.headers["x-forwarded-for"],
+      "X-Forwarded-Host": req.headers["x-forwarded-host"],
+      "X-Forwarded-Proto": req.headers["x-forwarded-proto"],
+    },
+  });
+
+/* Why the gateway has to explicitly re-set them, not just "pass through automatically"
+This connects back to something we covered with async/fetch: each fetch() call the gateway makes is a brand new, separate HTTP request
+ — it doesn't inherit anything from the incoming request unless you explicitly copy it over. This is genuinely a common real-world gotcha with proxies/gateways: forgetting this step is exactly how forwarded headers "mysteriously" stop working partway through a chain.
+ */
+
+
   const dataBody = await response.json();
 
   res.status(response.status).json(dataBody);
