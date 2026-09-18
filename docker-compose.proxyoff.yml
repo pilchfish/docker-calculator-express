@@ -1,4 +1,0 @@
-services:
-  gateway:
-    ports:
-      - "8080:8080"

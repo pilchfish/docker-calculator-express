@@ -1,0 +1,32 @@
+# docker-compose.override.yml (local dev — adds ports back)
+services:
+
+  gateway:
+    ports:
+      - "8080:8080"
+    healthcheck:
+      timeout: 45s
+
+  add-service:
+    ports:
+      - "8081:8080"
+    healthcheck:
+      timeout: 45s
+
+  subtract-service:
+    ports:
+      - "8082:8080"
+    healthcheck:
+      timeout: 45s
+
+  multiply-service:
+    ports:
+      - "8083:8080"
+    healthcheck:
+      timeout: 45s
+
+  divide-service:
+    ports:
+      - "8084:8080"
+    healthcheck:
+      timeout: 45s
