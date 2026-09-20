@@ -5,6 +5,9 @@ WORKDIR /app
 COPY calculator-microservices/multiply-service/package*.json ./calculator-microservices/multiply-service/
 RUN cd calculator-microservices/multiply-service && npm install
 
+COPY shared/package*.json ./shared/
+RUN cd shared && npm install
+
 COPY calculator-microservices/multiply-service ./calculator-microservices/multiply-service
 COPY shared ./shared
 
