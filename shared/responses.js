@@ -1,4 +1,5 @@
 import { errorLog } from "./loggers.js";
+import { logRequestToDb } from "./db.js";
 
 const operations = {
   "+": (a, b) => a + b,
@@ -17,7 +18,7 @@ export function healthCheck(serverType, port) {
 }
 
 export function apiResponseSuccess(symbol, serverType) {
-  return function (req, res) {
+  return async function (req, res) {
     const result = operations[symbol](req.numA, req.numB);
     res.json({
       mathmatic: serverType,
@@ -25,6 +26,11 @@ export function apiResponseSuccess(symbol, serverType) {
       input: { a: req.numA, b: req.numB },
       result: result,
     });
+    try {
+      await logRequestToDb(serverType, req, 200);
+    } catch (err) {
+      errorLog(serverType, `Failed to log to database: ${err.message}`, req);
+    }
   };
 }
 

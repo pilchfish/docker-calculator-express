@@ -25,13 +25,16 @@ gateway.get("/:operation", async (req, res) => {
   const { a, b } = req.query;
   const url = `http://${serviceName}:8080/${req.params.operation}?a=${a}&b=${b}`;
 
-  const response = await fetch(url, {
-    headers: {
-      "X-Forwarded-For": req.headers["x-forwarded-for"],
-      "X-Forwarded-Host": req.headers["x-forwarded-host"],
-      "X-Forwarded-Proto": req.headers["x-forwarded-proto"],
-    },
-  });
+  const forwardHeaders = {};
+  if (req.headers["x-forwarded-for"])
+    forwardHeaders["X-Forwarded-For"] = req.headers["x-forwarded-for"];
+  if (req.headers["x-forwarded-host"])
+    forwardHeaders["X-Forwarded-Host"] = req.headers["x-forwarded-host"];
+  if (req.headers["x-forwarded-proto"])
+    forwardHeaders["X-Forwarded-Proto"] = req.headers["x-forwarded-proto"];
+
+  const response = await fetch(url, { headers: forwardHeaders });
+
 
 /* Why the gateway has to explicitly re-set them, not just "pass through automatically"
 This connects back to something we covered with async/fetch: each fetch() call the gateway makes is a brand new, separate HTTP request

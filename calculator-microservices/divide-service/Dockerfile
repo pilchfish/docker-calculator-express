@@ -5,6 +5,9 @@ WORKDIR /app
 COPY calculator-microservices/divide-service/package*.json ./calculator-microservices/divide-service/
 RUN cd calculator-microservices/divide-service && npm install
 
+COPY shared/package*.json ./shared/
+RUN cd shared && npm install
+
 COPY calculator-microservices/divide-service ./calculator-microservices/divide-service
 COPY shared ./shared
 

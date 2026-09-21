@@ -5,6 +5,9 @@ WORKDIR /app
 COPY calculator-microservices/subtract-service/package*.json ./calculator-microservices/subtract-service/
 RUN cd calculator-microservices/subtract-service && npm install
 
+COPY shared/package*.json ./shared/
+RUN cd shared && npm install
+
 COPY calculator-microservices/subtract-service ./calculator-microservices/subtract-service
 COPY shared ./shared
 

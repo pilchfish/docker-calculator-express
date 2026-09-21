@@ -26,11 +26,6 @@ api.get(
   apiResponseSuccess(symbol, serverType),
 );
 
-// temporary — add this above the 404 handler, remove after testing
-api.get('/test-error', (req, res) => {
-  throw new Error('This is a deliberate test error');
-});
-
 api.use(apiResponseEndpointNotFound(endpoint));
 
 api.use(apiResponseServerError(serverType));

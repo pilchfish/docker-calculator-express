@@ -139,3 +139,19 @@ services:
       timeout: 3s
       retries: 3
       start_period: 15s
+
+  logs-db:
+    image: postgres:16-alpine
+    environment:
+      - POSTGRES_USER=calc_logs
+      - POSTGRES_PASSWORD=some-password
+      - POSTGRES_DB=calc_logs
+    volumes:
+      - logs-db-data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U calc_logs"]
+      interval: 10s
+      timeout: 3s
+      retries: 5
+volumes:
+  logs-db-data:
