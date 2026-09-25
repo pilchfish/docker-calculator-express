@@ -1,11 +1,11 @@
 services:
 
   nginx-proxy:
-    image: nginx:alpine
+    image: pilchfish/calc-nginx-proxy:latest
     ports:
       - "8888:80"
-    volumes:
-      - ./nginx.conf:/etc/nginx/nginx.conf:ro
+    environment:
+      - PROXY_TARGET=http://gateway:8080
     depends_on:
     - gateway
 
