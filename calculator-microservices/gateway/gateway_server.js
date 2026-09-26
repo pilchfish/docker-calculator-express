@@ -23,24 +23,29 @@ gateway.get("/:operation", async (req, res) => {
   }
 
   const { a, b } = req.query;
+  console.log("[gateway] parameter 'a'=", a, " parameter 'b'=", b);
   const url = `http://${serviceName}:8080/${req.params.operation}?a=${a}&b=${b}`;
 
   const forwardHeaders = {};
-  if (req.headers["x-forwarded-for"])
+  if (req.headers["x-forwarded-for"]) {
     forwardHeaders["X-Forwarded-For"] = req.headers["x-forwarded-for"];
-  if (req.headers["x-forwarded-host"])
+  }
+  if (req.headers["x-forwarded-host"]) {
     forwardHeaders["X-Forwarded-Host"] = req.headers["x-forwarded-host"];
-  if (req.headers["x-forwarded-proto"])
+  }
+  if (req.headers["x-forwarded-proto"]) {
     forwardHeaders["X-Forwarded-Proto"] = req.headers["x-forwarded-proto"];
+  }
+    console.log(
+      `[gateway] X-Forwarded-For: [${forwardHeaders["X-Forwarded-For"]}] - X-Forwarded-Host: [${forwardHeaders["X-Forwarded-Host"]}] - X-Forwarded-Proto: [${forwardHeaders["X-Forwarded-Proto"]}]`,
+    );
 
   const response = await fetch(url, { headers: forwardHeaders });
 
-
-/* Why the gateway has to explicitly re-set them, not just "pass through automatically"
+  /* Why the gateway has to explicitly re-set them, not just "pass through automatically"
 This connects back to something we covered with async/fetch: each fetch() call the gateway makes is a brand new, separate HTTP request
  — it doesn't inherit anything from the incoming request unless you explicitly copy it over. This is genuinely a common real-world gotcha with proxies/gateways: forgetting this step is exactly how forwarded headers "mysteriously" stop working partway through a chain.
  */
-
 
   const dataBody = await response.json();
 
