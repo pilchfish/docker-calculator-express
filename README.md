@@ -2,14 +2,17 @@
 
 ## What this project does
 
-A calculator API, built as a learning project spanning Node.js/Express, Docker, and Raspberry Pi deployment. It grew from a single service into a small, layered system:
+A calculator API, built as a learning project spanning Node.js/Express, Docker, multi-repo project structure, and Raspberry Pi deployment. It grew from a single service into a small, layered system spread across two repositories:
 
 ```
+calc-nginx-proxy repo (published as pilchfish/calc-nginx-proxy)
+    │
+    ▼  (referenced by image, not built inline)
 Client (Mac / phone / anything on the network)
     │
     ▼
 nginx-proxy  ── checks X-API-Key header, rejects with 403 if missing/wrong
-    │
+    │           forwards to whatever PROXY_TARGET is set to
     ▼
 gateway  ── routes /add, /subtract, /multiply, /divide to the right backend
     │
@@ -17,7 +20,7 @@ gateway  ── routes /add, /subtract, /multiply, /divide to the right backend
 add-service / subtract-service / multiply-service / divide-service
     │
     ▼
-logs-db (Postgres)  ── every request logged as a row, survives container restarts
+logs-db (Postgres)  ── every request logged as a row, schema auto-created, survives container restarts
 ```
 
 Each backend service exposes a `/health` endpoint, checked continuously by Docker Compose healthchecks. The whole stack runs via Docker Compose, both on a Mac (development) and a Raspberry Pi 4 (deployment target).
@@ -30,40 +33,41 @@ Each backend service exposes a `/health` endpoint, checked continuously by Docke
 
 ### Microservices split
 - Split into four independent services (add/subtract/multiply/divide), each with its own Dockerfile, orchestrated by one `docker-compose.yml`
-- Extracted shared middleware into `shared/` (`loggers.js`, `validation.js`, `responses.js`) using the closure pattern, so each service configures shared functions with its own `serverType`
-- Solved a Docker build-context bug where `shared/` wasn't reachable from each service's container, by widening the Compose build context to the repo root and mirroring the local folder structure inside each image
-- Per-service config (port, endpoint, serverType, symbol) moved to environment variables
-- Added proper error handling: a 404 catch-all and a 500 error handler (using Express's 4-argument `(err, req, res, next)` signature)
-- Fixed several "closure called immediately instead of handed to Express" bugs — the recurring lesson across the whole project: a function passed to Express must not be called directly, only its *return value* should be
+- Extracted shared middleware into `shared/` (`loggers.js`, `validation.js`, `responses.js`) using the closure pattern
+- Solved a Docker build-context bug where `shared/` wasn't reachable from each service's container
+- Per-service config moved to environment variables; proper 404/500 error handling added
 
 ### Developer experience
-- Replaced Compose's `sync+restart` watch action with `nodemon` running inside each container
-- Added Compose healthchecks with a `start_period` to avoid startup races
-- Set up a Colima ARM64 VM profile to build/test ARM64 images locally on an Intel Mac before deploying to the Pi
-- Did a manual Docker networking exercise on the Pi (no Compose) — `docker network create` plus `docker run --network --name` — confirming by hand exactly what Compose automates for container-to-container DNS resolution
+- `nodemon` inside each container for auto-restart, with Compose `watch` (`sync`) copying changed files in
+- Compose healthchecks with `start_period` to avoid startup races
+- A Colima ARM64 VM profile to build/test ARM64 images locally on an Intel Mac
+- A manual Docker networking exercise on the Pi (no Compose) to understand exactly what Compose automates
 
 ### Gateway
-- Built a gateway service that receives requests on one port and routes them to the correct backend using container-to-container networking (Compose service names as hostnames)
-- Currently a transparent pass-through, relaying the backend's exact status code and body
+- Routes requests to the correct backend using container-to-container networking; currently a transparent pass-through
 
 ### Security layer: nginx-proxy
-- Added an nginx reverse-proxy container in front of the gateway, whose only job is checking for a required `X-API-Key` header and rejecting anything without it (403)
-- The gateway itself is no longer reachable directly — no published port in the base `docker-compose.yml`
-- Split the compose config into a locked-down base file (`docker-compose.yml`, no ports on gateway/backends) and a gitignored `docker-compose.override.yml` that adds ports back for convenient local dev — Compose loads the override automatically; `docker compose -f docker-compose.yml up` runs the secure version explicitly
-- Explored (but held off on) adding a Pi host firewall (`ufw`) to further restrict which client IPs can reach published ports
+- An nginx reverse-proxy in front of the gateway, checking a required `X-API-Key` header before forwarding
+- The gateway itself has no published port — only reachable through the proxy
+- A locked-down base `docker-compose.yml` plus a gitignored `docker-compose.override.yml` that adds ports back for local dev
 
 ### Request origin tracking
-- `nginx-proxy` sets `X-Forwarded-For` / `X-Forwarded-Host` / `X-Forwarded-Proto` from the real incoming request
-- The gateway explicitly re-sets these headers on its own outgoing `fetch` call to the backend (since a new `fetch` request doesn't automatically inherit headers from the request that triggered it) and logs them
-- Backends log them too, with a `"direct"` fallback for requests that bypass the proxy entirely
-- Fixed a subtle bug where forwarding a genuinely-missing header through `fetch`'s headers object caused it to serialize as the literal text `"undefined"` (later `"null"`) downstream, instead of being absent — fixed by only adding a header to the outgoing request when a real value exists
+- `X-Forwarded-For`/`Host`/`Proto` set by the proxy, re-set by the gateway on its own outgoing `fetch` call, and logged by the backends (with a `"direct"` fallback when the proxy is bypassed)
+- Fixed a bug where forwarding a genuinely-missing header caused it to serialize as the literal text `"undefined"`/`"null"` downstream instead of being absent
 
 ### Persistent logging: Postgres
-- Added `logs-db`, a Postgres 16 container with a named Docker volume, so log data survives `docker compose down`/`up` — proven with a manual insert-then-restart test
-- Created a `request_logs` table (service, method, path, forwarded-for/host/proto, status code, timestamp)
-- Built `shared/db.js` as its own mini-package (own `package.json` and `node_modules`) after learning that installed npm packages — unlike your own relative-import code — need `node_modules` local to wherever the importing file lives; each service's Dockerfile now also installs `shared`'s own dependencies inside the container
-- Wired logging into `apiResponseSuccess` with `try/catch` around the database write, so a database failure is logged but never breaks the actual API response
-- `"direct"` (not a blank/NULL value) is stored for the forwarded-origin columns when a request bypasses the proxy, so it's easy to query for later
+- `logs-db`, a Postgres 16 container with a named Docker volume, so log data survives `docker compose down`/`up`
+- A `request_logs` table (service, method, path, forwarded-for/host/proto, status code, timestamp)
+- `shared/db.js` built as its own mini-package (own `package.json`/`node_modules`), after learning installed npm packages need `node_modules` local to wherever the importing file lives — unlike your own relative-import code
+- Logging wired into `apiResponseSuccess` with `try/catch`, so a database failure is logged but never breaks the actual API response
+- **New**: schema creation automated via a mounted `init.sql` in Postgres's `/docker-entrypoint-initdb.d/`, which only runs against a genuinely fresh, empty data volume — no more manual `psql` setup for a new deployment. Along the way, hit a Docker bind-mount gotcha where a missing source file gets silently mounted as an empty directory instead of erroring, and confirmed the "runs once" behavior by comparing a fresh-volume start (`down -v`) against a plain restart
+
+### New: nginx-proxy as its own published repo
+- Moved the proxy out of the calculator repo entirely, into its own repo (`calc-nginx-proxy`), built and pushed to Docker Hub as `pilchfish/calc-nginx-proxy`
+- Made the proxy's forwarding target configurable via a `PROXY_TARGET` environment variable, using nginx's built-in template mechanism: a file in `/etc/nginx/templates/` ending in `.template` gets run through `envsubst` automatically at container startup, substituting real environment variable values into `${PLACEHOLDER}` spots
+- Learned two real gotchas along the way: the template must contain only what belongs *inside* `http {}` (the base image already provides the outer `events {}`/`http {}` wrapper — including it caused an `"events" directive is not allowed here` error), and the base image's default `conf.d/default.conf` needs removing to avoid a duplicate `server` block listening on the same port
+- The calculator repo's `docker-compose.yml` now references `image: pilchfish/calc-nginx-proxy:latest` with `environment: PROXY_TARGET=http://gateway:8080`, instead of `build: ./nginx-proxy` — the calculator repo no longer contains the proxy's source at all
+- Considered doing the same split for `logs-db`, but decided against it: the proxy was genuinely generic and reusable, whereas `logs-db`'s schema is intrinsically specific to this project's own data model — there's little to gain from separating something that isn't actually a shared, independent concern
 
 ## How to run
 
@@ -89,7 +93,8 @@ curl "http://localhost:8081/add?a=5&b=3"
 
 Stop everything:
 ```bash
-docker compose down
+docker compose down          # keep data
+docker compose down -v       # also wipe volumes (e.g. logs-db data) — use deliberately
 ```
 
 ### Locally with Node (no Docker)
@@ -104,6 +109,14 @@ SYMBOL=+
 ```bash
 cd calculator-microservices/add-service
 node --watch --env-file=.env add_server.js
+```
+
+### The proxy repo (calc-nginx-proxy), on its own
+
+```bash
+docker build -t pilchfish/calc-nginx-proxy:latest .
+docker run -e PROXY_TARGET=http://example.com -p 8888:80 pilchfish/calc-nginx-proxy:latest
+docker push pilchfish/calc-nginx-proxy:latest
 ```
 
 ## Useful commands
@@ -127,6 +140,7 @@ docker compose logs -f | grep -v '/health'   # hide healthcheck noise
 ```bash
 docker compose exec add-service sh
 docker compose exec logs-db psql -U calc_logs -d calc_logs
+docker compose exec logs-db psql -U calc_logs -d calc_logs -c "\dt"   # list tables
 ```
 
 **Healthchecks**
@@ -134,9 +148,8 @@ docker compose exec logs-db psql -U calc_logs -d calc_logs
 docker inspect <container> --format='{{json .Config.Healthcheck}}'   # configured check
 docker inspect <container> --format='{{json .State.Health}}' | jq    # recent run history
 ```
-Note: healthchecks run continuously (every ~10s) for the life of the container — the steady stream of `/health` log lines is expected, not a bug.
 
-**Postgres queries** (from inside `logs-db`)
+**Postgres queries**
 ```sql
 SELECT * FROM request_logs ORDER BY id DESC LIMIT 20;
 SELECT * FROM request_logs WHERE forwarded_for = 'direct';
@@ -151,15 +164,19 @@ docker network disconnect <network> <container>
 
 ## JavaScript & Node concepts learned along the way
 
-- **Functions are values** — a function reference without `()` never runs; adding `()` runs it immediately. Root cause of nearly every middleware bug hit this project.
-- **Closures** (a function returning a function) — used throughout `shared/` so middleware can be pre-configured (e.g. with `serverType`) before Express calls the returned inner function later, once per request.
-- **Middleware** — any function Express calls automatically as part of handling a request, recognizable by its `(req, res, next)` (or 4-argument error-handler) shape and by being handed to `app.use()`/`app.get()` rather than called directly.
-- **ES Modules** (`import`/`export`) vs CommonJS (`require`/`module.exports`) — two module systems that can't mix in one file; `package.json`'s `"type"` field sets the default.
-- **`async`/`await` and `fetch`** — a Promise represents a value that isn't ready yet; `await` pauses just the current function without freezing the whole program. This is what lets the gateway make a request to a backend and wait for the response, and what makes a Postgres query (`pool.query`) awaitable the same way a `fetch` call is.
-- **Docker build-context isolation** — each service only sees files inside its own build context by default; sharing code means widening the context and mirroring the local folder structure.
+- **Functions are values** — a function reference without `()` never runs; adding `()` runs it immediately.
+- **Closures** (a function returning a function) — used throughout `shared/` for pre-configurable middleware.
+- **Middleware** — any function Express calls automatically, recognizable by its `(req, res, next)` (or 4-arg error-handler) shape.
+- **ES Modules** vs CommonJS — two module systems that can't mix in one file.
+- **`async`/`await` and `fetch`** — a Promise represents a value that isn't ready yet; `await` pauses just the current function. Applies equally to a `fetch` call and a Postgres `pool.query`.
+- **Docker build-context isolation** — each service only sees files inside its own build context by default.
 - **Container-to-container networking** — Compose gives every service a DNS-resolvable hostname matching its service name.
-- **npm packages need their own `node_modules` per location** — unlike your own relative-import code, an installed package like `pg` is resolved relative to the importing file's own `node_modules`, not just wherever the file happens to live; a shared folder using an installed package needs its own `package.json`/`node_modules`, or the dependency needs installing in every consumer.
-- **Reverse proxies vs plain port forwarding** — a port map is a dumb pipe with a fixed destination; a proxy terminates the connection and makes a decision (which header to check, which backend to call) before forwarding on.
+- **npm packages need their own `node_modules` per location** — unlike your own relative-import code.
+- **Reverse proxies vs plain port forwarding** — a port map is a dumb pipe; a proxy makes a decision before forwarding on.
+- **New: Docker volumes and stateful containers** — most containers in this project are stateless (destroy and rebuild freely); a database needs a named volume to persist data outside the container's own lifecycle.
+- **New: image publishing and multi-repo structure** — a genuinely reusable component (the proxy) can be built, tagged, and pushed as its own image, then referenced by tag from an entirely separate project's compose file, with no shared source code between the two repos.
+- **New: nginx config templating** — `envsubst` and the `/etc/nginx/templates/` convention let an image accept runtime configuration (like a forwarding target) without needing project-specific values baked in at build time.
+- **New: database initialization scripts** — Postgres's `/docker-entrypoint-initdb.d/` convention runs `.sql` files automatically, but only against a genuinely fresh, empty data volume — not on every restart.
 
 ## Next steps / backlog
 
@@ -167,7 +184,7 @@ docker network disconnect <network> <container>
 2. Give the gateway its own error handling instead of pure pass-through
 3. A clearer error response body when `nginx-proxy` rejects a request with 403
 4. Redesign to a single endpoint (e.g. `/sum?2+6`) where the gateway parses the expression itself
-5. Move `nginx-proxy` into its own separate repo, then figure out building/running both repos together
-6. A local reverse-proxy/port-forward (e.g. SSH tunnel) from the Mac to the Pi, instead of typing `pi-docker.local` each time
-7. `X-Forwarded-For`-based rate limiting or a simple caching layer at the gateway, as further proxy-concept exercises
-8. Revisit the Pi host firewall (`ufw`) idea for IP-based access restriction
+5. A local reverse-proxy/port-forward (e.g. SSH tunnel) from the Mac to the Pi, instead of typing `pi-docker.local` each time
+6. `X-Forwarded-For`-based rate limiting or a simple caching layer at the gateway, as further proxy-concept exercises
+7. Revisit the Pi host firewall (`ufw`) idea for IP-based access restriction
+8. Build and push an ARM64 (or multi-arch) version of `calc-nginx-proxy` so the Pi pulls a native-architecture image
