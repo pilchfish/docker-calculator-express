@@ -1,0 +1,29 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: add-service
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: add-service
+  template:
+    metadata:
+      labels:
+        app: add-service
+    spec:
+      containers:
+        - name: add-service
+          image: calc_node_docker-add-service:latest
+          imagePullPolicy: IfNotPresent
+          ports:
+            - containerPort: 8080
+          env:
+            - name: PORT
+              value: "8080"
+            - name: ENDPOINT
+              value: "/add"
+            - name: SERVER_TYPE
+              value: "add-service"
+            - name: SYMBOL
+              value: "+"

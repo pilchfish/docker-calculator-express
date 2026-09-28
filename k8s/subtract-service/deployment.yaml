@@ -1,0 +1,29 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: subtract-service
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: subtract-service
+  template:
+    metadata:
+      labels:
+        app: subtract-service
+    spec:
+      containers:
+        - name: subtract-service
+          image: calc_node_docker-subtract-service:latest
+          imagePullPolicy: IfNotPresent
+          ports:
+            - containerPort: 8080
+          env:
+            - name: PORT
+              value: "8080"
+            - name: ENDPOINT
+              value: "/subtract"
+            - name: SERVER_TYPE
+              value: "subtract-service"
+            - name: SYMBOL
+              value: "-"

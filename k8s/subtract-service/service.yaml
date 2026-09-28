@@ -1,0 +1,10 @@
+apiVersion: v1
+kind: Service
+metadata:
+  name: subtract-service
+spec:
+  selector:
+    app: subtract-service
+  ports:
+    - port: 8080
+      targetPort: 8080

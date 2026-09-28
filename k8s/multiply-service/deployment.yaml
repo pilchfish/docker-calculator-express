@@ -1,0 +1,29 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: multiply-service
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: multiply-service
+  template:
+    metadata:
+      labels:
+        app: multiply-service
+    spec:
+      containers:
+        - name: multiply-service
+          image: calc_node_docker-multiply-service:latest
+          imagePullPolicy: IfNotPresent
+          ports:
+            - containerPort: 8080
+          env:
+            - name: PORT
+              value: "8080"
+            - name: ENDPOINT
+              value: "/multiply"
+            - name: SERVER_TYPE
+              value: "multiply-service"
+            - name: SYMBOL
+              value: "*"
