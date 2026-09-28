@@ -1,7 +1,7 @@
 services:
 
   nginx-proxy:
-    image: pilchfish/calc-nginx-proxy:latest
+    image: pilchfish/docker-nginx-proxy:latest
     ports:
       - "8888:80"
     environment:
