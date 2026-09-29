@@ -1,0 +1,29 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: divide-service
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: divide-service
+  template:
+    metadata:
+      labels:
+        app: divide-service
+    spec:
+      containers:
+        - name: divide-service
+          image: calc_node_docker-divide-service:latest
+          imagePullPolicy: IfNotPresent
+          ports:
+            - containerPort: 8080
+          env:
+            - name: PORT
+              value: "8080"
+            - name: ENDPOINT
+              value: "/divide"
+            - name: SERVER_TYPE
+              value: "divide-service"
+            - name: SYMBOL
+              value: "/"

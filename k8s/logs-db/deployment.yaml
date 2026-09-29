@@ -1,0 +1,38 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: logs-db
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: logs-db
+  template:
+    metadata:
+      labels:
+        app: logs-db
+    spec:
+      containers:
+        - name: logs-db
+          image: postgres:16-alpine
+          ports:
+            - containerPort: 5432
+          env:
+            - name: POSTGRES_USER
+              value: "calc_logs"
+            - name: POSTGRES_PASSWORD
+              value: "some-password"
+            - name: POSTGRES_DB
+              value: "calc_logs"
+          volumeMounts:
+            - name: logs-db-storage
+              mountPath: /var/lib/postgresql/data
+            - name: logs-db-init
+              mountPath: /docker-entrypoint-initdb.d
+      volumes:
+        - name: logs-db-storage
+          persistentVolumeClaim:
+            claimName: logs-db-pvc
+        - name: logs-db-init
+          configMap:
+            name: logs-db-init
