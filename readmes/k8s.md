@@ -44,6 +44,55 @@ This is a looser mapping, worth flagging as such rather than pretending it's exa
 Does this mapping make sense as a starting mental model? Once it feels solid, the natural next step would be installing k3d locally and translating just `add-service` — the simplest possible piece — into its first real Kubernetes manifests, so you see these concepts as actual YAML rather than just theory.
 
 
+# addon to this info
+Good question — this fills in the last layer underneath everything we've mapped so far. Let's build the whole hierarchy, top to bottom.
+
+**The full chain, biggest to smallest**
+
+```
+Cluster
+ └── Node(s)          ← actual machines (or, here, containers acting as machines)
+      └── Pod(s)       ← your unit of deployment
+           └── Container(s)  ← the actual running process (Node, Postgres, nginx)
+```
+
+**Cluster — the whole thing, as one system**
+
+A cluster is the entire Kubernetes setup you're managing as a single unit — `calc-cluster`, in your case. When you run `kubectl` commands, you're talking to the cluster as a whole; you don't usually address individual machines directly.
+
+**Node — an actual machine that Pods get scheduled onto**
+
+This is the new piece. A **Node** is a real (or, in your case, virtualized) machine that has enough resources — CPU, memory — to actually run workloads. In a genuine production setup, a Node would typically be one physical server or one cloud VM. Your cluster has exactly one: `k3d-calc-cluster-server-0`.
+
+**Where this connects to something you already understand**: remember how, way back, you discovered that k3d's entire cluster runs *as Docker containers* on your Mac? That server Node you're looking at is itself a Docker container — one that's set up to *behave like* a full machine capable of running Kubernetes workloads inside it. So there's a genuinely fun bit of layering happening: Docker containers, containing a Kubernetes Node, which in turn schedules and runs *more* containers (your Pods) inside it.
+
+**Why your cluster shows a `server` and also a `serverlb` and `tools` node**
+
+- **`k3d-calc-cluster-server-0`** — the actual Node that runs the Kubernetes control plane *and* is where your Pods actually get scheduled (since you have 0 separate "agent" nodes, this one server node does double duty as both).
+- **`k3d-calc-cluster-serverlb`** — this is k3d's own internal load balancer, the thing that makes `kubectl port-forward` and port-mapping into the cluster work at all — it's part of k3d's *tooling*, not a genuine Kubernetes Node your workloads get scheduled onto.
+- **`k3d-calc-cluster-tools`** — a small internal helper container k3d uses for its own setup/maintenance tasks, again not something your actual application workloads run on.
+
+Only the `server` entry is a genuine Kubernetes Node in the sense we've been discussing; the other two are k3d's own supporting infrastructure for making the local cluster work smoothly, roughly analogous to `docker-proxy` or other helper processes Docker itself runs that aren't "your containers" either.
+
+**What a genuine multi-Node cluster looks like, for contrast**
+
+In a real cloud deployment (tying back to our GCP conversation), you might have three, five, or fifty Nodes — actual separate machines. Kubernetes's scheduler decides *which* Node each Pod actually runs on, based on available resources, and can move Pods between Nodes if one fails (this is the "self-healing across hardware" capability that Compose genuinely can't do at all, since Compose only ever knows about one machine).
+
+**A useful command to actually see this layering yourself**
+
+```bash
+kubectl get pods -o wide
+```
+The `-o wide` flag adds a `NODE` column, showing you exactly which Node each of your Pods is currently scheduled onto. Since you only have one real Node, everything will show the same one — but this is exactly the column that would show variety across multiple Pods spread over several machines in a bigger cluster.
+
+**Tying it directly to the Pi, since that's where this is heading next**: when you eventually run k3s on the Pi, that Pi *is* your Node — a single real physical machine, no Docker-container-pretending-to-be-a-machine layer involved, since k3s runs natively on the Pi's own OS rather than being nested inside Docker the way k3d is on your Mac.
+
+Does that layering make sense — cluster as the whole system, Node as the machine, Pod as your deployable unit, container as the actual process — or want to see it made concrete with `kubectl get pods -o wide` and `kubectl get nodes -o wide` run side by side against your actual cluster?
+
+
+
+
+
 
 
 
