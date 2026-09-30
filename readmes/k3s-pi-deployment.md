@@ -184,3 +184,298 @@ sudo k3s crictl images
 **Good general rule to take away from this**: `kubectl` (with `--kubeconfig` pointing at a remote cluster) is for *cluster-level* concerns — Pods, Deployments, Services, anything the Kubernetes API itself manages. Anything about a *specific machine's* local state — its container runtime's images, its disk, its OS-level processes — needs you to actually be on that machine, whether via SSH or sitting at it directly. This is a good moment to notice the same "isolation boundary" theme that's run through nearly every layer of this project: Docker build contexts, k3d's Docker-in-Docker, and now cluster-level tools vs. machine-level tools.
 
 Try the SSH version and paste what `k3s crictl images` shows — that'll tell us whether the manual `k3s ctr images import` step is actually needed.
+
+
+# look at kustomiation.md as added this in this part before moving on
+
+
+when I rebuilt the proxy I gave it a different tag, before it was :latest and now  its pilchfish/docker-nginx-proxy:arm64
+in the deployment.yaml file its
+spec:
+  template:
+    spec:
+      containers:
+              containers:
+                image: pilchfish/docker-nginx-proxy:latest
+
+is there a way to make this dynamic at runtime and pass in an argument to set the tag?
+ image: pilchfish/docker-nginx-proxy:{{docker hub-proxy-tag}}
+
+
+
+Good question — and first, a quick catch: your pasted YAML has `containers:` listed twice in a row, nested inside itself, which is invalid structure (a leftover from editing, most likely). Worth fixing that regardless of the tag question — should be:
+```yaml
+spec:
+  template:
+    spec:
+      containers:
+        - name: nginx-proxy
+          image: pilchfish/docker-nginx-proxy:latest
+```
+
+**Now, to your actual question — yes, this is a real and common need, with two standard approaches**
+
+Plain `kubectl apply -f` on raw YAML has no built-in variable substitution — Kubernetes just reads the file literally. So `{{docker-hub-proxy-tag}}` as you've written it wouldn't work out of the box; you need one of these tools layered on top.
+
+**Option 1: `envsubst` — the same tool you already used for the nginx config itself**
+
+Since you've already done exactly this trick once this project (nginx's `${PROXY_TARGET}` templating), the same idea applies here:
+
+```yaml
+# deployment.yaml.template
+containers:
+  - name: nginx-proxy
+    image: pilchfish/docker-nginx-proxy:${IMAGE_TAG}
+```
+
+```bash
+export IMAGE_TAG=arm64
+envsubst < deployment.yaml.template > deployment.yaml
+kubectl apply -f deployment.yaml
+```
+
+Simple, and you already understand the mechanism — but it's a manual step you run yourself each time, not something Kubernetes or `kubectl` does natively.
+
+**Option 2: Kustomize — built directly into `kubectl`, the more "proper" Kubernetes-native way**
+
+Kustomize lets you keep a base manifest untouched, and layer *overrides* on top — genuinely similar in spirit to your Compose `docker-compose.override.yml` pattern.
+
+```yaml
+# base/deployment.yaml — the "real" file, checked into git, always says :latest
+containers:
+  - name: nginx-proxy
+    image: pilchfish/docker-nginx-proxy:latest
+```
+
+```yaml
+# overlays/pi/kustomization.yaml
+resources:
+  - ../../base
+images:
+  - name: pilchfish/docker-nginx-proxy
+    newTag: arm64
+```
+
+```bash
+kubectl apply -k overlays/pi/
+```
+
+`-k` (instead of `-f`) tells `kubectl` to run this through Kustomize, which reads the base file, applies the tag override, and applies the *result* — without you ever hand-editing the original file or needing a separate `envsubst` step.
+
+**Which would I suggest?**
+
+Given you're already comfortable with the override-file pattern from Compose, and Kustomize is genuinely built into `kubectl` (no extra install needed — try `kubectl kustomize --help` to confirm it's there), I'd lean toward **Kustomize** here — it's the standard, idiomatic Kubernetes way of handling exactly this "same manifest, different tag per environment" problem, and it'll generalize well once you have more than just the proxy's tag varying between your Mac's k3d and the Pi's k3s.
+
+Want to set up a `base/` + `overlays/pi/` structure for just the proxy first, to see Kustomize in action before deciding whether to extend it to the rest of your manifests?
+
+
+
+Good, let's set it up for the proxy only, and prove it works before deciding whether to extend the pattern.
+
+**1. Restructure the proxy's manifests into a `base/` folder**
+
+```
+k8s/
+└── nginx-proxy/
+    ├── base/
+    │   ├── deployment.yaml
+    │   ├── service.yaml
+    │   └── kustomization.yaml
+    └── overlays/
+        └── pi/
+            └── kustomization.yaml
+```
+
+**2. `k8s/nginx-proxy/base/deployment.yaml`** — your existing file, fixed and untouched otherwise:
+```yaml
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: nginx-proxy
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: nginx-proxy
+  template:
+    metadata:
+      labels:
+        app: nginx-proxy
+    spec:
+      containers:
+        - name: nginx-proxy
+          image: pilchfish/docker-nginx-proxy:latest
+          ports:
+            - containerPort: 80
+          env:
+            - name: PROXY_TARGET
+              value: "http://gateway:8080"
+```
+
+**3. `k8s/nginx-proxy/base/service.yaml`** — unchanged from what you already have.
+
+**4. `k8s/nginx-proxy/base/kustomization.yaml`** — a new file, this is what makes the folder "a Kustomize base":
+```yaml
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+resources:
+  - deployment.yaml
+  - service.yaml
+```
+This just lists which plain manifest files belong to this base — Kustomize needs this file to know what it's working with.
+
+**5. `k8s/nginx-proxy/overlays/pi/kustomization.yaml`** — the actual override:
+```yaml
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+resources:
+  - ../../base
+images:
+  - name: pilchfish/docker-nginx-proxy
+    newTag: arm64
+```
+- `resources: - ../../base` — "start from that base folder"
+- `images: - name: ... newTag: arm64` — "wherever the base references this image, swap the tag to `arm64`"
+
+**6. Test it without applying anything yet — just see what Kustomize would produce:**
+```bash
+kubectl kustomize k8s/nginx-proxy/overlays/pi/
+```
+This prints the fully-resolved YAML to your terminal. Check that the `image:` line now reads `pilchfish/docker-nginx-proxy:arm64` — proof the substitution worked, before anything touches the actual cluster.
+
+**7. Once that looks right, apply it for real (against the Pi's kubeconfig):**
+```bash
+kubectl --kubeconfig ~/k3s-pi.yaml apply -k k8s/nginx-proxy/overlays/pi/
+```
+
+**And for your Mac's k3d cluster, you'd just apply the base directly, untouched:**
+```bash
+kubectl apply -k k8s/nginx-proxy/base/
+```
+(or even plain `kubectl apply -f k8s/nginx-proxy/base/`, since a Kustomize base with no overlay is really just... your original manifests)
+
+Try step 6 first — run `kubectl kustomize k8s/nginx-proxy/overlays/pi/` and paste what it outputs, so we can confirm the tag substitution before applying anything for real.
+
+
+
+
+
+yes output gave         image: pilchfish/docker-nginx-proxy:arm64 
+so its working. 
+Also on the pi I have  exported all docker images and successfully imported into k3s. 
+So am I ready now to run the deployment?
+
+
+
+
+
+Good, both pieces are in place — Kustomize confirmed working, and the images loaded into k3s's containerd store on the Pi. A few things worth checking before you actually apply everything, since this is the first time this full set of manifests will run against a genuinely different machine than the one they were proven on.
+
+**1. Double-check `imagePullPolicy` on your four locally-imported services**
+
+Since these images now live in k3s's containerd store but aren't on any registry, each of their Deployments needs:
+```yaml
+imagePullPolicy: IfNotPresent
+```
+Same reasoning as k3d — without this, k3s might try to pull from Docker Hub by default and fail, since these images were never pushed anywhere.
+
+**2. Confirm every image *name* in your manifests still matches exactly what you imported**
+
+Worth a quick sanity check:
+```bash
+ssh pilch@pi-docker.local "sudo k3s crictl images"
+```
+Compare this list against the exact `image:` lines in each of your four backend Deployments — an easy place for a stray mismatch to hide (remember the `calc_node_docker-add-service` vs whatever-you-actually-tagged-it mismatch from the k3d side).
+
+**3. The proxy needs the Kustomize overlay, not the plain base**
+
+Since you're deploying to the Pi specifically, remember to apply via the `pi` overlay (`arm64` tag), not the plain base (which still says `:latest`) — easy to mix up now that both exist.
+
+**4. `logs-db`'s PersistentVolumeClaim will provision fresh storage on the Pi**
+
+Worth remembering this is a brand-new cluster, so the PVC will bind to new, empty storage — your `request_logs` table will be created fresh via the ConfigMap init script, not carrying over any data from your Mac's k3d testing (which is correct and expected, just worth not being surprised by).
+
+**5. Apply everything, pointed at the Pi**
+
+```bash
+kubectl --kubeconfig ~/k3s-pi.yaml apply -f k8s/add-service/
+kubectl --kubeconfig ~/k3s-pi.yaml apply -f k8s/subtract-service/
+kubectl --kubeconfig ~/k3s-pi.yaml apply -f k8s/multiply-service/
+kubectl --kubeconfig ~/k3s-pi.yaml apply -f k8s/divide-service/
+kubectl --kubeconfig ~/k3s-pi.yaml apply -f k8s/gateway/
+kubectl --kubeconfig ~/k3s-pi.yaml apply -f k8s/logs-db/
+kubectl --kubeconfig ~/k3s-pi.yaml apply -k k8s/nginx-proxy/overlays/pi/
+```
+
+**6. Check everything came up**
+
+```bash
+kubectl --kubeconfig ~/k3s-pi.yaml get pods -o wide
+```
+The `-o wide` here is worth using specifically now, since (unlike k3d) you'd genuinely expect the `NODE` column to show something meaningful once you eventually add more Pi's — even with just one Node today, it's a good habit to start checking.
+
+Give that a run and paste what `get pods` shows — want to confirm everything's `Running` before moving on to testing via `port-forward` against the Pi's cluster.
+
+
+
+
+
+
+
+
+
+everything is up and running 
+❯ kubectl --kubeconfig ~/k3s-pi.yaml get pods
+NAME                                READY   STATUS    RESTARTS   AGE
+add-service-854d6dbdbc-cxhtp        1/1     Running   0          11m
+divide-service-9d8ddd695-8mrwb      1/1     Running   0          10m
+gateway-569b5cc69d-6bvnh            1/1     Running   0          10m
+logs-db-6f79cb7fdd-2xhj9            1/1     Running   0          9m43s
+multiply-service-79f46bd44c-p68mf   1/1     Running   0          10m
+nginx-proxy-b497bf688-blfvq         1/1     Running   0          3m55s
+subtract-service-84dd84c876-226ws   1/1     Running   0          10m
+
+I also  kubectl describe pod -l app=nginx-proxy to confirm tag:arm64 was picked up and is was as it shows 
+Image:          pilchfish/docker-nginx-proxy:arm64
+
+so ready for port-forwarding
+
+
+
+
+
+
+Genuinely excellent — every single Pod `Running`, and you did exactly the right verification step (checking the actual image tag via `describe`, not just assuming the overlay worked). That's the full Kubernetes stack now running on real hardware, built with real ARM64 images, tagged correctly per environment via Kustomize.
+
+**Test it end to end, through the whole chain**
+
+```bash
+kubectl --kubeconfig ~/k3s-pi.yaml port-forward service/nginx-proxy 8888:80
+```
+
+Then, in another terminal:
+```bash
+curl -H "X-API-Key: your-secret-key-here" "http://localhost:8888/add?a=5&b=3"
+```
+
+If that comes back correctly, you've proven the entire path: your Mac's `kubectl` → the Pi's real k3s cluster → `nginx-proxy` (auth-checked, ARM64) → `gateway` → `add-service` → response, all the way back — the complete migration from k3d-on-Mac to k3s-on-the-Pi, done.Go ahead and run that `curl` — let me know what comes back, and we'll have the full k3d→k3s migration officially confirmed end to end.
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
