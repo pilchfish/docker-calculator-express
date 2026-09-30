@@ -14,7 +14,7 @@ spec:
     spec:
       containers:
         - name: nginx-proxy
-          image: pilchfish/docker-nginx-proxy:arm64
+          image: pilchfish/docker-nginx-proxy:latest
           imagePullPolicy: IfNotPresent
           ports:
             - containerPort: 80

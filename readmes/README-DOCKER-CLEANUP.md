@@ -48,3 +48,17 @@ docker compose down
 docker compose up --build add-service
 ```
 `down` clears out the old container, `--build` on the way back up forces Docker to rebuild the image fresh with your latest Dockerfile changes, rather than risk reusing a stale cached layer from before your fix.
+
+
+
+Use this to delete everything:
+```bash
+docker system prune -a --volumes
+```
+Remove all unused containers, volumes, networks and images
+WARNING! This will remove:
+    - all stopped containers
+    - all networks not used by at least one container
+    - all volumes not used by at least one container
+    - all images without at least one container associated to them
+    - all build cache

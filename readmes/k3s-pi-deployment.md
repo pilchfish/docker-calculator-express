@@ -103,3 +103,84 @@ Want me to save this plan for reference, and then start with step 1 — installi
 
 
 
+
+
+
+
+
+ok thanks. Now back to the steps. Step 4 how do I get images on to, made available in to the pi node. 
+I have to latest codebase on the pi. I ran docker compose build so it build all the images on the pi so they are arm64, minus the proxy.
+
+I rebuilt the proxy as an arm64 version and pushed that to docker hub so it can be pulled down. 
+
+but when I run kubectrl image import, but there is not image import command
+
+
+
+
+Good, real progress — and you've actually already spotted the key issue yourself: `k3d image import` genuinely doesn't exist here, and for a specific, important reason worth understanding rather than just working around.
+
+**Why `k3d image import` doesn't apply to the Pi at all**
+
+That command is a **k3d-specific** feature — remember, k3d's whole trick is running Kubernetes *inside Docker containers* on your Mac, which is exactly why it needed a special mechanism to shuttle images from your Mac's regular Docker into its nested cluster-in-Docker setup. Your Pi's k3s installation has **no such nesting** — it's running directly on the Pi's own OS, using the Pi's own container runtime underneath (k3s actually bundles `containerd`, not Docker itself, for running containers). So there's no "k3d-style" import command, because there's no k3d-style isolation problem to solve in the first place.
+
+**The real question: does the Pi's k3s (containerd) even see the images you built with `docker compose build`?**
+
+This is worth checking directly, since it's not guaranteed:
+```bash
+sudo k3s crictl images
+```
+`crictl` is the equivalent of `docker images`, but for k3s's own container runtime specifically. Check whether your `calc_node_docker-add-service` etc. images show up in *this* list — they might not, even though `docker images` (your regular Docker/Compose setup on the Pi) shows them fine, because **k3s's containerd and the Pi's regular Docker are two separate, independent container systems**, much like k3d's Docker vs. its nested cluster were.
+
+**If they're not there (likely), the fix: `k3s ctr images import`**
+
+This is k3s's actual, real equivalent of what you were trying with `image import`:
+```bash
+docker save calc_node_docker-add-service:latest -o add-service.tar
+sudo k3s ctr images import add-service.tar
+```
+- `docker save ... -o add-service.tar` — exports your regular Docker's image into a plain tarball file
+- `sudo k3s ctr images import add-service.tar` — loads that tarball directly into k3s's own containerd image store
+
+You'd repeat this for each of your four locally-built images (not needed for the proxy, since that one genuinely pulls from Docker Hub for real).
+
+**Confirm it worked**
+```bash
+sudo k3s crictl images
+```
+You should now see `calc_node_docker-add-service` listed.
+
+**One more thing worth setting on your Deployments, mirroring what you already did on the Mac**: keep `imagePullPolicy: IfNotPresent` on each locally-built service's container spec, so k3s doesn't try to pull from Docker Hub for images that only exist locally.
+
+Give the `crictl images` check a try first — that'll confirm whether this manual `ctr images import` step is genuinely needed, or whether k3s can already see your Compose-built images some other way.
+
+
+
+# error when running command on mac
+on Mac ❯ kubectl --kubeconfig ~/k3s-pi.yaml k3s crictl images
+Error: flags cannot be placed before plugin name: --kubeconfig
+
+# reply to error
+Good catch on the error — and worth explaining why this particular command genuinely can't work the way you tried it, rather than it being a flag-ordering fix.
+
+**Why this doesn't work as a `kubectl` command at all**
+
+`crictl` is a completely separate tool from `kubectl` — it talks directly to the container runtime (`containerd`) on a specific machine, not to the Kubernetes API the way `kubectl` does. `kubectl` has no concept of "run crictl for me" — there's no such subcommand, which is why it's trying (and failing) to interpret `k3s` and `crictl` as plugin/flag names instead.
+
+**The real constraint: `crictl`/`k3s ctr` only make sense run *on* the Pi itself**
+
+Since these tools talk directly to that one machine's local container runtime, they're not something you can point at a remote machine the way `kubectl --kubeconfig` lets you do for cluster-level commands. You need to actually be logged into the Pi to run them.
+
+**So, run this over SSH instead:**
+```bash
+ssh pilch@pi-docker.local "sudo k3s crictl images"
+```
+or, more simply, just SSH in properly and run it there directly:
+```bash
+ssh pilch@pi-docker.local
+sudo k3s crictl images
+```
+
+**Good general rule to take away from this**: `kubectl` (with `--kubeconfig` pointing at a remote cluster) is for *cluster-level* concerns — Pods, Deployments, Services, anything the Kubernetes API itself manages. Anything about a *specific machine's* local state — its container runtime's images, its disk, its OS-level processes — needs you to actually be on that machine, whether via SSH or sitting at it directly. This is a good moment to notice the same "isolation boundary" theme that's run through nearly every layer of this project: Docker build contexts, k3d's Docker-in-Docker, and now cluster-level tools vs. machine-level tools.
+
+Try the SSH version and paste what `k3s crictl images` shows — that'll tell us whether the manual `k3s ctr images import` step is actually needed.

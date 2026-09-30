@@ -14,7 +14,7 @@ spec:
     spec:
       containers:
         - name: subtract-service
-          image: calc_node_docker-subtract-service:latest
+          image: docker-calculator-express-subtract-service:latest
           imagePullPolicy: IfNotPresent
           ports:
             - containerPort: 8080

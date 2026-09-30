@@ -14,7 +14,7 @@ spec:
     spec:
       containers:
         - name: add-service
-          image: calc_node_docker-add-service:latest
+          image: docker-calculator-express-add-service:latest
           imagePullPolicy: IfNotPresent
           ports:
             - containerPort: 8080
