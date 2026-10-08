@@ -3,7 +3,6 @@ kind: Service
 metadata:
   name: nginx-proxy
 spec:
-  type: LoadBalancer
   selector:
     app: nginx-proxy
   ports:
