@@ -14,7 +14,7 @@ spec:
     spec:
       containers:
         - name: gateway
-          image: calc_node_docker-gateway:latest
+          image: docker-calculator-express-gateway:latest
           imagePullPolicy: IfNotPresent
           ports:
             - containerPort: 8080

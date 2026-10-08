@@ -14,7 +14,7 @@ spec:
     spec:
       containers:
         - name: multiply-service
-          image: calc_node_docker-multiply-service:latest
+          image: docker-calculator-express-multiply-service:latest
           imagePullPolicy: IfNotPresent
           ports:
             - containerPort: 8080

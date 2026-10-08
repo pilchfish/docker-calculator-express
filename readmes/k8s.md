@@ -90,6 +90,131 @@ The `-o wide` flag adds a `NODE` column, showing you exactly which Node each of 
 Does that layering make sense — cluster as the whole system, Node as the machine, Pod as your deployable unit, container as the actual process — or want to see it made concrete with `kubectl get pods -o wide` and `kubectl get nodes -o wide` run side by side against your actual cluster?
 
 
+so pi-docker is a kubernetes node, an environment ready to run jobs which have containers inside them
+
+# running on pi $ kubectl --kubeconfig ~/k3s-pi.yaml get nodes
+seems to be working ❯ kubectl --kubeconfig ~/k3s-pi.yaml get nodes
+NAME        STATUS   ROLES           AGE   VERSION
+pi-docker   Ready    control-plane   57m   v1.36.4+k3s1
+
+
+
+That's a genuinely nice moment — `pi-docker` listed right there as `Ready`, and this time it's not a container pretending to be a machine, it's the actual Pi sitting on your desk, reachable over your home network. That's the Node concept made completely real.
+
+
+so pi-docker is a kubernetes node, an environment ready to run jobs which have containers inside them
+
+
+Very close — worth tightening one small piece of terminology, since it'll matter once you have multiple things running.
+
+**Your statement, corrected slightly**: `pi-docker` is a Kubernetes Node — an environment ready to run **Pods**, and each Pod holds one or more containers.
+
+**Why "jobs" isn't quite the right word here**
+
+"Job" is actually a *specific*, different Kubernetes resource type — a `Job` is for running something that's meant to complete and finish (like a one-off batch task or migration script), not a resource type for regular, always-running services like your `add-service` or `logs-db`. Since you haven't used Jobs at all in this project (everything you've built uses Deployments, which are for things meant to run continuously), it's worth not reaching for that word by accident — it names a genuinely different concept than what you're describing.
+
+**The corrected version of your sentence**
+
+`pi-docker` is a Kubernetes **Node** — a real machine that has enough resources to run workloads, onto which the Kubernetes scheduler places **Pods**. Each Pod wraps one or more **containers** (in your project's case, almost always just one container per Pod — your Node app, or Postgres, or nginx). The thing that actually *tells* Kubernetes "keep some number of these Pods running, and replace them if they die" is a **Deployment**, sitting one level above the Pod.
+
+**The full chain again, with your correction folded in:**
+
+```
+Cluster
+ └── Node (pi-docker)         ← the real machine, ready to run Pods
+      └── Pod                  ← created and kept alive by a Deployment
+           └── Container(s)    ← the actual running process
+```
+
+Good instinct to check this rather than just assume — "Job" and "Pod" sound similar enough, and mixing them up would cause real confusion down the line once you're reading Kubernetes documentation or other people's YAML and see an actual `kind: Job` resource that does something quite different from what you'd expect.
+
+
+
+so if I had 6 separate pi's (nodes), and each pi just has 1 pod and deploys its own service in a container, add, subtract, divide, multiple. 
+1 for a proxy and 1 for gateway.  
+
+As they are all related in one way would those 6 nodes become a cluster?
+
+
+Genuinely good scenario to reason through — you're most of the way there, but there's one important correction: what you're describing would need a bit more setup to actually *become* a cluster, rather than automatically being one just because the machines are related in purpose.
+
+**A cluster isn't defined by "these machines are doing related work" — it's defined by them being deliberately joined together under one shared control plane**
+
+Six Raspberry Pis, each independently running its own separate install of k3s, each with its own separate `kubectl get nodes` only ever showing itself — that's **six separate single-Node clusters**, not one six-Node cluster. Nothing about them being physically near each other, or running related services, joins them together automatically. Clustering is something you have to explicitly set up.
+
+**How you'd actually turn them into one real cluster**
+
+This is genuinely how k3s is designed to work, and it maps directly onto what you did today, just repeated:
+
+1. Install k3s on **one** Pi as the "server" (control plane) — exactly what you already did.
+2. On each of the other five Pis, instead of running the same install-as-a-new-cluster command, you'd run k3s's **agent** install, pointed at the first Pi's address and a shared join token:
+```bash
+curl -sfL https://get.k3s.io | K3S_URL=https://<first-pi-ip>:6443 K3S_TOKEN=<token-from-first-pi> sh -
+```
+3. Now `kubectl get nodes` (run against the first Pi, or your Mac pointed at it) would show **all six** Pis listed as Nodes belonging to the *same* cluster.
+
+**Once they're a genuine cluster, here's the interesting part — your 1-pod-per-Pi plan wouldn't actually work the way you're picturing**
+
+You're imagining a fixed, manual assignment — "this Pi runs `add-service`, that Pi runs `gateway`." But that's not really how a real cluster operates: once six Nodes join one cluster, **you don't get to hand-pick which Node runs which Pod** (not without extra configuration, anyway) — the Kubernetes **scheduler** decides, automatically, based on available resources across the whole cluster. You'd apply your existing Deployments (`add-service`, `gateway`, etc.), each asking for "1 replica," and Kubernetes would spread them across whichever Nodes it judges best — quite possibly *not* one-per-Pi at all; it might put two services on one Pi and none on another, depending on load.
+
+**Why this matters, and connects back to the very first thing we discussed about clusters**
+
+This is genuinely the point of Kubernetes over what you built with Compose: you stop thinking about *which specific machine* something runs on, and instead just declare *what* should be running and *how many copies* — Kubernetes handles the "where," and if one Pi died entirely, it would automatically reschedule that Pi's Pods onto one of the five remaining ones, self-healing across real hardware failure. That's the payoff of clustering multiple Nodes together, and it's a capability Compose (limited to one machine) could never offer you at all.
+
+**If you specifically wanted a fixed 1-service-per-Pi assignment anyway**
+
+Kubernetes does let you force this with something called `nodeSelector` or `nodeAffinity` — pinning a specific Deployment to a specific, named Node. It's a real, valid feature, but it goes somewhat against the grain of what clustering is *for* — you'd be opting back into manual placement, giving up some of the automatic resilience that's the main reason to cluster machines together in the first place.
+
+
+
+
+
+so if I had 6 separate pi's (nodes), and each pi just has 1 pod and deploys its own service in a container, add, subtract, divide, multiple. 
+1 for a proxy and 1 for gateway.  
+
+As they are all related in one way would those 6 nodes become a cluster?
+
+
+
+
+
+Good, genuinely solid instinct on the first half — but worth pausing on the second half, since there's a subtlety about *direction* that's worth getting right before you try it.
+
+**First half — yes, exactly right**
+
+You already have this working today: one Pi, one Node, all your services' Deployments applied to it, Kubernetes deciding Pod placement (trivial with one Node, since everything goes there, but the mechanism is genuinely the same one that'd apply with six). Nothing more needed there — that part's already true of your current setup.
+
+**Second half — the direction is flipped from what you're picturing**
+
+You said "install k3s on the Mac, and get the Pi to join the Mac to be controlled under the Mac's control panel." Two things worth untangling:
+
+1. **The Pi is already the server (control plane)** — remember, you ran the plain install script (`curl -sfL https://get.k3s.io | sh -`) directly on the Pi, which makes *the Pi* the control-plane Node. If you wanted a second machine to join *that* cluster, the *Mac* would be the one running the agent-join command, pointed at the *Pi's* address and token — not the other way around. Whichever machine you install the plain server script on first becomes the "hub"; everything else joins *it*.
+
+2. **Should your Mac even become a genuine cluster Node at all?** This is worth thinking through, separate from the direction question. Your Mac is your development machine — you use it to write code, run Colima/k3d for local testing, edit files, and so on. Turning it into a permanent, always-on worker Node in the *same* cluster as your Pi is a bit of an unusual setup in practice, for a few reasons:
+   - It would need to be powered on and running k3s continuously for the cluster to stay healthy — not how you'd normally treat your everyday laptop
+   - k3d (which you already have) exists specifically so your Mac can *simulate* a cluster locally without needing to be a genuine permanent member of one
+   - In a real-world setup, you'd typically want your *development* environment (k3d on the Mac) kept separate from your actual *deployment target* (k3s on the Pi, or a real cluster of dedicated Pi's) — mixing "the machine I'm coding on" into the same live cluster as "the machine serving real requests" blurs a line that's usually kept deliberately clean.
+
+**A more realistic version of what you're reaching for**
+
+If the *goal* is "see genuine multi-Node clustering in action," the cleaner path is: get yourself a **second Raspberry Pi** (or even a spare old laptop, repurposed) as a dedicated second Node, join *it* to your existing Pi's cluster as an agent, and now you've got a real two-Node cluster made of two dedicated, always-on devices — much closer to how this actually looks in the real world, and it sidesteps the "should my daily-driver Mac be a permanent cluster member" question entirely.
+
+**Does that distinction — Pi as the hub, Mac staying as your dev environment rather than joining — make sense as the more sensible path, or is there a specific reason you wanted the Mac itself to become a Node in this cluster?**
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 
 
@@ -389,7 +514,7 @@ spec:
     spec:
       containers:
         - name: gateway
-          image: calc_node_docker-gateway:latest
+          image: docker-calculator-express-gateway:latest
           imagePullPolicy: IfNotPresent
           ports:
             - containerPort: 8080

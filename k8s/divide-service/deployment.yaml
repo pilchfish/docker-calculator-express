@@ -14,7 +14,7 @@ spec:
     spec:
       containers:
         - name: divide-service
-          image: calc_node_docker-divide-service:latest
+          image: docker-calculator-express-divide-service:latest
           imagePullPolicy: IfNotPresent
           ports:
             - containerPort: 8080
