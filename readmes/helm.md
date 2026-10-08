@@ -109,3 +109,117 @@ kubectl --kubeconfig ~/k3s-pi.yaml apply -f metallb-config.yaml
 ```
 
 Run through steps 1–4 first and paste what `get pods -n metallb-system` shows — want to confirm MetalLB itself is healthy before we configure the actual IP pool and change your `nginx-proxy` Service to type `LoadBalancer`.
+
+
+
+
+# question wha tis meant by... From your Mac, pointed at the Pi's cluster:
+
+Good to double-check rather than assume — let me be precise about it.
+
+**What I mean**: you don't need to SSH into the Pi to run the `helm install` command. You can run it directly in a terminal on your Mac, exactly the way you've been running `kubectl --kubeconfig ~/k3s-pi.yaml ...` commands all session — Helm works the same way `kubectl` does, talking to the cluster remotely over the network rather than needing to run locally on the machine hosting it.
+
+**Concretely, this command:**
+```bash
+helm install metallb metallb/metallb --kubeconfig ~/k3s-pi.yaml -n metallb-system --create-namespace
+```
+...is meant to be typed into your Mac's regular terminal — the same terminal window/session where you've already been running things like:
+```bash
+kubectl --kubeconfig ~/k3s-pi.yaml get pods
+```
+
+**Why this works**
+
+Helm doesn't have its own separate concept of "which cluster" — under the hood, it actually just reads the same kubeconfig mechanism `kubectl` uses to figure out which cluster to talk to, and sends its own requests to that cluster's Kubernetes API over the network. That's why passing `--kubeconfig ~/k3s-pi.yaml` to `helm` (the same file you already set up earlier) is enough to point it at the Pi's cluster specifically, rather than any other cluster you might have configured (like your k3d one).
+
+**Contrast with step 2 (disabling ServiceLB)** — that one genuinely does need to run *on* the Pi itself, via SSH, since `systemctl edit k3s` is modifying the Pi's own local system service configuration — a machine-level change, not a cluster-API-level one. That's the same distinction from earlier today: `kubectl`/`helm` talk to the cluster's API remotely; anything about the actual machine itself (`systemctl`, `crictl`, `k3s ctr`) needs you to be logged into that specific machine.
+
+So to summarize which commands go where:
+- **On your Mac**: `helm install ...`, `kubectl --kubeconfig ~/k3s-pi.yaml ...`
+- **On the Pi (via SSH)**: `sudo systemctl edit k3s`, `sudo systemctl restart k3s`
+
+Does that clear up which terminal each command belongs in?
+
+
+
+
+
+
+```bash
+kubectl --kubeconfig ~/k3s-pi.yaml get pods -n metallb-system
+NAME                                             READY   STATUS    RESTARTS      AGE
+metallb-controller-bc9cbb54b-gxhh4               1/1     Running   1 (41m ago)   7d22h
+metallb-frr-k8s-g29l9                            5/5     Running   5 (41m ago)   7d22h
+metallb-frr-k8s-statuscleaner-75b695f48d-q6ddz   1/1     Running   2 (41m ago)   7d22h
+metallb-speaker-ftqxj                            1/1     Running   1 (41m ago)   7d22h
+```
+
+
+All four MetalLB Pods `Running` — controller, the FRR speaker set, the status cleaner, and the speaker itself. MetalLB is healthy and ready to be configured.
+
+**Next: tell MetalLB which IPs it's allowed to hand out**
+
+Before applying this, double check your router's DHCP range (usually in its admin page, same `192.168.0.1` you've used before) so the range below genuinely sits *outside* what your router hands out automatically — otherwise you risk two devices fighting over the same address.
+
+```yaml
+# metallb-config.yaml
+apiVersion: metallb.io/v1beta1
+kind: IPAddressPool
+metadata:
+  name: pi-pool
+  namespace: metallb-system
+spec:
+  addresses:
+    - 192.168.0.240-192.168.0.250
+---
+apiVersion: metallb.io/v1beta1
+kind: L2Advertisement
+metadata:
+  name: pi-l2adv
+  namespace: metallb-system
+spec:
+  ipAddressPools:
+    - pi-pool
+```
+
+- **`IPAddressPool`** — the actual range MetalLB is allowed to assign from.
+- **`L2Advertisement`** — tells MetalLB *how* to make those IPs reachable on your network. "L2" means Layer 2 (ARP) — MetalLB answers "who has this IP?" on your local network directly, which is the simplest mode and the right one for a home network like yours (the alternative, BGP mode, is for proper routed networks with real routers that speak BGP — not relevant here).
+
+**Apply it:**
+```bash
+kubectl --kubeconfig ~/k3s-pi.yaml apply -f metallb-config.yaml
+```
+
+**Now, the actual payoff — change `nginx-proxy`'s Service from `ClusterIP` (the implicit default you've been using) to `LoadBalancer`:**
+
+```yaml
+# k8s/nginx-proxy/base/service.yaml
+apiVersion: v1
+kind: Service
+metadata:
+  name: nginx-proxy
+spec:
+  type: LoadBalancer
+  selector:
+    app: nginx-proxy
+  ports:
+    - port: 80
+      targetPort: 80
+```
+
+```bash
+kubectl --kubeconfig ~/k3s-pi.yaml apply -f k8s/nginx-proxy/base/service.yaml
+```
+
+**Check what IP MetalLB assigned:**
+```bash
+kubectl --kubeconfig ~/k3s-pi.yaml get service nginx-proxy
+```
+Look at the `EXTERNAL-IP` column — it should show a real address from your `240-250` range, no longer `<pending>`.
+
+**Test it — no `port-forward`, no open terminal required this time:**
+```bash
+curl -H "X-API-Key: your-secret-key-here" "http://192.168.0.24X/add?a=5&b=3"
+```
+
+If that works, you've got permanent, always-on external access to the cluster — genuinely closing out the last piece of friction from today's whole Kubernetes journey. Give it a try and paste what `EXTERNAL-IP` shows.
