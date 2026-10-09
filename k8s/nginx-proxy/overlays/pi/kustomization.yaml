@@ -5,3 +5,10 @@ resources:
 images:
   - name: pilchfish/docker-nginx-proxy
     newTag: arm64
+patches:
+  - target:
+      kind: Service
+    patch: |-
+      - op: replace
+        path: /spec/type
+        value: LoadBalancer

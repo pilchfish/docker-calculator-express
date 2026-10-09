@@ -113,7 +113,7 @@ Run through steps 1–4 first and paste what `get pods -n metallb-system` shows 
 
 
 
-# question wha tis meant by... From your Mac, pointed at the Pi's cluster:
+# question what is meant by... From your Mac, pointed at the Pi's cluster:
 
 Good to double-check rather than assume — let me be precise about it.
 
@@ -223,3 +223,126 @@ curl -H "X-API-Key: your-secret-key-here" "http://192.168.0.24X/add?a=5&b=3"
 ```
 
 If that works, you've got permanent, always-on external access to the cluster — genuinely closing out the last piece of friction from today's whole Kubernetes journey. Give it a try and paste what `EXTERNAL-IP` shows.
+
+
+
+
+
+
+
+
+
+
+
+
+# next steps
+ok those small jobs sound good, we will make those changes now. Then after I would like to see how to see the log output from a k3s set up. As I cannot use stern as its not installed on the pi so what are the alternatives, can I log into a pod and see kubenetes log details or is setting up a pod purely for logging and log into that to see all traffic
+
+
+
+
+
+
+
+
+
+
+
+
+# answer
+Both jobs are quick. Then logs, where I think the stern problem has an easy fix.
+
+**Job 1: move `LoadBalancer` into the pi overlay**
+
+1. Put the patch from my last message into `k8s/nginx-proxy/overlays/pi/kustomization.yaml`.
+2. Remove the `type: LoadBalancer` line from `base/service.yaml`.
+3. Apply the overlay, not the base:
+```bash
+kubectl --kubeconfig ~/k3s-pi.yaml apply -k k8s/nginx-proxy/overlays/pi/
+kubectl --kubeconfig ~/k3s-pi.yaml get service nginx-proxy
+```
+The Service is updated in place, so `EXTERNAL-IP` should stay the same. Confirm it does.
+
+**Job 2: move the API key into a Secret**
+
+1. **Generate a new key.** If your Docker Hub repo is public, treat the old one as exposed.
+```bash
+openssl rand -hex 24
+```
+
+2. **Create the Secret.** There are two ways:
+
+   **A: imperative, so the key never touches a file** (my pick):
+   ```bash
+   kubectl --kubeconfig ~/k3s-pi.yaml create secret generic nginx-proxy-secret \
+     --from-literal=API_KEY=<your-new-key>
+   ```
+   **B: a manifest**, which is reproducible, but you must gitignore it:
+   ```yaml
+   # k8s/nginx-proxy/secret.yaml  (add to .gitignore!)
+   apiVersion: v1
+   kind: Secret
+   metadata:
+     name: nginx-proxy-secret
+   stringData:
+     API_KEY: <your-new-key>
+   ```
+   Secrets are base64-encoded, not encrypted, so a committed manifest would expose the key just as plainly as the template did.
+
+3. **Change the proxy repo's template** to read the key from the environment:
+```nginx
+map $http_x_api_key $is_authorized {
+  default 0;
+  "${API_KEY}" 1;
+}
+```
+
+4. **Feed it to the container** in `base/deployment.yaml`, next to `PROXY_TARGET`:
+```yaml
+- name: API_KEY
+  valueFrom:
+    secretKeyRef:
+      name: nginx-proxy-secret
+      key: API_KEY
+```
+
+5. **Rebuild the ARM64 image and push it under a new tag**, say `arm64-2`, then update `newTag` in the overlay. Don't reuse `arm64`. Non-`latest` tags default to `imagePullPolicy: IfNotPresent`, so the Pi would keep running its cached old image. This is a good case for having the tag in the overlay.
+
+6. **Apply and test.** The new key should return 200 and the old one 403.
+
+For Compose and your Mac's k3d, the same `API_KEY` variable needs supplying. In Compose that means `environment: - API_KEY=${API_KEY}` plus a gitignored `.env`. In Compose, an unset variable becomes an empty string, and the template would then read `"" 1;`, which authorises any request without the header. Kubernetes is safer here, because a missing Secret stops the Pod from starting.
+
+**Logs on k3s**
+
+You don't need stern on the Pi. It's a client-side tool like `kubectl` and `helm`, so it runs on your Mac and talks to the cluster remotely:
+```bash
+brew install stern
+stern --kubeconfig ~/k3s-pi.yaml .
+```
+That gives you the all-pods, interleaved, colour-coded view you had with Compose.
+
+As you like seeing the alternatives, here are the others:
+
+- **Plain kubectl, one service:**
+  ```bash
+  kubectl --kubeconfig ~/k3s-pi.yaml logs deploy/add-service -f --tail=50
+  ```
+- **Plain kubectl, everything**, after adding a shared label such as `project: calculator` to each Pod template:
+  ```bash
+  kubectl --kubeconfig ~/k3s-pi.yaml logs -l project=calculator -f --prefix --max-log-requests=10
+  ```
+  `--prefix` shows which Pod each line came from. The limit defaults to 5, so raise it with seven Pods.
+- **On the Pi itself:**
+  ```bash
+  sudo k3s crictl ps                  # find container IDs
+  sudo k3s crictl logs <id>
+  journalctl -u k3s -f                # k3s's own logs, for cluster-level problems
+  ```
+
+**Logging into a pod:** `kubectl exec -it deploy/add-service -- sh` works, but it won't show you logs, because they aren't files inside the Pod. Your app writes to stdout and containerd captures it on the Node, which is where `kubectl logs` reads it from.
+
+**A dedicated logging Pod:** the real version of your idea is a log collector running as a **DaemonSet** (one Pod per Node). It reads every container's logs, ships them to a store such as **Loki**, and you browse them in **Grafana**. You'd install it with Helm, which you now know. It's a sizeable project, but a good one, so I'd save it for later.
+
+You also already have request-level logging in `logs-db`. You can query it with `kubectl exec` into the Postgres Pod and run `psql`. At the moment only `add-service` writes to it on success, which is the backlog item about rolling it out to the other services.
+
+For now I'd go with stern from your Mac. Shall I add the Loki/Grafana idea to the backlog?
